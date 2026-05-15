@@ -1,10 +1,10 @@
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { env } from "../config/env.js";
-import { INCINERATOR_ADDRESS } from "../config/constants.js";
 import { getVault, getVote, logActivity, archiveVote, closeVote, tallyVoteRecords } from "../db/queries.js";
 import { buildSwapTx, getQuote, WSOL_MINT } from "../integrations/jupiter.js";
 import { loadKeypair, sendBundledSwap } from "../integrations/wallets.js";
 import { primaryConnection } from "../integrations/helius.js";
+import { burnTokens } from "../utils/spl.js";
 import { logger } from "../utils/logger.js";
 import { formatSol } from "../utils/format.js";
 import { postTelegram } from "../integrations/telegram.js";
@@ -61,26 +61,20 @@ async function handleBuyBurn(vote: { decision_pool_sol: number | string }) {
     userPublicKey: payer.publicKey.toBase58(),
   });
   const swapSig = await sendBundledSwap({ payer, tx, solValue: sol });
-  // Burn: forward to incinerator. (Real impl: SPL transfer to INCINERATOR_ADDRESS.)
-  const conn = primaryConnection();
-  const { blockhash } = await conn.getLatestBlockhash("confirmed");
-  const ix = SystemProgram.transfer({
-    fromPubkey: payer.publicKey,
-    toPubkey: new PublicKey(INCINERATOR_ADDRESS),
-    lamports: 1_000, // marker tx; SPL burn is implemented when the token program client is wired
+
+  // SPL burn: actual on-chain reduction of $PULSE supply held by the bot wallet.
+  const burnAmountAtomic = BigInt(quote.outAmount);
+  const burnSig = await burnTokens({
+    payer,
+    mint: new PublicKey(env.PULSE_MINT_ADDRESS),
+    amountAtomic: burnAmountAtomic,
   });
-  const msg = new TransactionMessage({
-    payerKey: payer.publicKey,
-    recentBlockhash: blockhash,
-    instructions: [ix],
-  }).compileToV0Message();
-  const marker = new VersionedTransaction(msg);
-  marker.sign([payer]);
-  const burnSig = await conn.sendTransaction(marker, { maxRetries: 3 });
-  await conn.confirmTransaction(burnSig, "confirmed");
+
+  const decimals = Number(env.PULSE_DECIMALS ?? 6);
+  const burnedTokens = Number(burnAmountAtomic) / 10 ** decimals;
   return {
     txSig: swapSig ?? burnSig,
-    summary: `🔥 Buy + Burn executed — ${formatSol(sol)} of $PULSE bought and sent to incinerator.`,
+    summary: `🔥 Buy + Burn executed — ${formatSol(sol)} bought, ${Math.round(burnedTokens).toLocaleString("en-US")} $PULSE burned.`,
   };
 }
 
@@ -151,16 +145,29 @@ async function handleTreasuryTrade(vote: { decision_pool_sol: number | string })
 }
 
 async function handlePulseWars(vote: { decision_pool_sol: number | string }) {
-  // Pulse Wars: buy supply of a target competitor memecoin and burn it. Uses
-  // the same target_mint field set by the team before vote opens.
+  // Pulse Wars: buy supply of a target competitor memecoin and burn it.
   const target = (vote as { target_mint?: string }).target_mint;
   if (!target) {
     return { txSig: null, summary: `⚔️ Pulse Wars reserved — target mint not set.` };
   }
+  const sol = Number(vote.decision_pool_sol);
   if (env.DRY_RUN) {
-    return { txSig: null, summary: `⚔️ [DRY-RUN] Pulse Wars vs ${target}` };
+    return { txSig: null, summary: `⚔️ [DRY-RUN] Pulse Wars: would buy + burn ${formatSol(sol)} of ${target}` };
   }
-  return { txSig: null, summary: `⚔️ Pulse Wars executor stub — wire SPL burn before mainnet.` };
+  const payer = loadKeypair("BOT");
+  const lamports = BigInt(Math.floor(sol * LAMPORTS_PER_SOL));
+  const quote = await getQuote({ inputMint: WSOL_MINT, outputMint: target, amountAtomic: lamports });
+  const { tx } = await buildSwapTx({ quote, userPublicKey: payer.publicKey.toBase58() });
+  const swapSig = await sendBundledSwap({ payer, tx, solValue: sol });
+  const burnSig = await burnTokens({
+    payer,
+    mint: new PublicKey(target),
+    amountAtomic: BigInt(quote.outAmount),
+  });
+  return {
+    txSig: swapSig ?? burnSig,
+    summary: `⚔️ Pulse Wars executed — ${formatSol(sol)} of ${target.slice(0, 6)}… bought and burned.`,
+  };
 }
 
 async function handleHold(_: unknown) {

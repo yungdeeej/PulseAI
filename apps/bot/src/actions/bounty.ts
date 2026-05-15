@@ -96,53 +96,150 @@ export async function evaluateBountyForTrade(args: {
   for (const b of open.rows) {
     if (!matchesCondition(b.conditions, args)) continue;
     try {
-      await fulfillBounty(b.id, args.wallet, Number(b.reward_sol));
+      if (b.conditions.kind === "FIRST_5_BUYERS") {
+        await fulfillFirstNBuyers(b.id, args.wallet, Number(b.reward_sol), b.conditions.count ?? 5);
+      } else {
+        await fulfillBounty(b.id, args.wallet, Number(b.reward_sol));
+      }
     } catch (err) {
       logger.warn({ err, bounty: b.id }, "bounty fulfillment failed");
     }
   }
 }
 
-function matchesCondition(c: BountyCondition, trade: { side: "BUY" | "SELL"; solAmount: number }) {
+/**
+ * Periodic scan: if a wallet has held ≥ $50K for `duration_hours`, fulfill any
+ * open FIRST_50K_HOLD bounty.
+ */
+export async function evaluateHoldBounties(): Promise<void> {
+  const open = await pool.query<{
+    id: string;
+    conditions: BountyCondition;
+    reward_sol: number;
+  }>(
+    `SELECT id, conditions, reward_sol FROM bounties
+       WHERE fulfilled_at IS NULL AND expires_at > NOW()
+         AND conditions->>'kind' = 'FIRST_50K_HOLD'`,
+  );
+  if (open.rows.length === 0) return;
+
+  const state = await pool.query<{ price_usd: number }>(
+    "SELECT price_usd FROM token_state WHERE id = 1",
+  );
+  const price = Number(state.rows[0]?.price_usd ?? 0);
+  if (price <= 0) return;
+
+  for (const b of open.rows) {
+    const minUsd = b.conditions.min_balance_usd ?? 50_000;
+    const dur = b.conditions.duration_hours ?? 24;
+    const minTokens = minUsd / price;
+    const r = await pool.query<{ wallet: string }>(
+      `SELECT wallet FROM holder_balances
+         WHERE balance >= $1 AND first_seen_at <= NOW() - ($2 || ' hours')::interval
+         ORDER BY first_seen_at ASC LIMIT 1`,
+      [minTokens, String(dur)],
+    );
+    const winner = r.rows[0]?.wallet;
+    if (winner) await fulfillBounty(b.id, winner, Number(b.reward_sol));
+  }
+}
+
+async function fulfillFirstNBuyers(
+  bountyId: string,
+  wallet: string,
+  rewardSol: number,
+  cap: number,
+): Promise<void> {
+  // Use a single UPDATE with a JSONB counter to atomically claim a slot.
+  const r = await pool.query<{
+    id: string;
+    progress: { count: number; buyers: string[] };
+  }>(
+    `UPDATE bounties
+       SET conditions = jsonb_set(
+         conditions,
+         '{progress}',
+         COALESCE(conditions->'progress', '{"count":0,"buyers":[]}'::jsonb) ||
+           jsonb_build_object(
+             'count', COALESCE((conditions->'progress'->>'count')::int, 0) + 1,
+             'buyers', COALESCE(conditions->'progress'->'buyers', '[]'::jsonb) || to_jsonb($2::text)
+           )
+       )
+       WHERE id = $1
+         AND fulfilled_at IS NULL
+         AND COALESCE((conditions->'progress'->>'count')::int, 0) < $3
+         AND NOT (COALESCE(conditions->'progress'->'buyers', '[]'::jsonb) @> to_jsonb($2::text))
+       RETURNING id, conditions->'progress' AS progress`,
+    [bountyId, wallet, cap],
+  );
+  const row = r.rows[0];
+  if (!row) return;
+  const count = Number(row.progress?.count ?? 0);
+  await payBounty(bountyId, wallet, rewardSol / cap, /* finalize */ count >= cap);
+}
+
+function matchesCondition(
+  c: BountyCondition,
+  trade: { wallet: string; side: "BUY" | "SELL"; solAmount: number },
+) {
   if (c.kind === "NEXT_BIG_BUY") {
     return trade.side === "BUY" && trade.solAmount >= (c.min_sol ?? Infinity);
   }
+  if (c.kind === "FIRST_5_BUYERS") {
+    // Per-bounty buyer counter is tracked in `progress_count` (see fulfillBounty).
+    return trade.side === "BUY";
+  }
+  // FIRST_50K_HOLD is matched out-of-band by a periodic check, not on each trade.
   return false;
 }
 
 async function fulfillBounty(bountyId: string, wallet: string, rewardSol: number): Promise<void> {
+  await payBounty(bountyId, wallet, rewardSol, /* finalize */ true);
+}
+
+async function payBounty(
+  bountyId: string,
+  wallet: string,
+  rewardSol: number,
+  finalize: boolean,
+): Promise<void> {
   if (!(await tryReserveDailyBudget(rewardSol))) {
-    logger.warn({ bountyId }, "bounty fulfillment skipped — daily cap");
+    logger.warn({ bountyId }, "bounty payout skipped — daily cap");
     return;
   }
-  let txSig: string | null = null;
-  if (!env.DRY_RUN) {
-    const payer = loadKeypair("OPERATIONS");
-    const conn = primaryConnection();
-    const { blockhash } = await conn.getLatestBlockhash("confirmed");
-    const ix = SystemProgram.transfer({
-      fromPubkey: payer.publicKey,
-      toPubkey: new PublicKey(wallet),
-      lamports: Math.floor(rewardSol * LAMPORTS_PER_SOL),
-    });
-    const msg = new TransactionMessage({
-      payerKey: payer.publicKey,
-      recentBlockhash: blockhash,
-      instructions: [ix],
-    }).compileToV0Message();
-    const tx = new VersionedTransaction(msg);
-    tx.sign([payer]);
-    txSig = await conn.sendTransaction(tx, { maxRetries: 3 });
-    await conn.confirmTransaction(txSig, "confirmed");
+  const txSig = await sendSolTransfer(wallet, rewardSol);
+  if (finalize) {
+    await pool.query(
+      `UPDATE bounties SET fulfilled_at = NOW(), fulfilled_wallet = $1 WHERE id = $2`,
+      [wallet, bountyId],
+    );
   }
-  await pool.query(
-    `UPDATE bounties SET fulfilled_at = NOW(), fulfilled_wallet = $1 WHERE id = $2`,
-    [wallet, bountyId],
-  );
   await logActivity(
     "BOUNTY_FULFILLED",
     `🎉 Bounty fulfilled by ${wallet} — paid ${formatSol(rewardSol)}`,
-    { bountyId, wallet, rewardSol },
+    { bountyId, wallet, rewardSol, finalize },
     txSig,
   );
+}
+
+async function sendSolTransfer(wallet: string, sol: number): Promise<string | null> {
+  if (env.DRY_RUN) return null;
+  const payer = loadKeypair("OPERATIONS");
+  const conn = primaryConnection();
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const ix = SystemProgram.transfer({
+    fromPubkey: payer.publicKey,
+    toPubkey: new PublicKey(wallet),
+    lamports: Math.floor(sol * LAMPORTS_PER_SOL),
+  });
+  const msg = new TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: blockhash,
+    instructions: [ix],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(msg);
+  tx.sign([payer]);
+  const sig = await conn.sendTransaction(tx, { maxRetries: 3 });
+  await conn.confirmTransaction(sig, "confirmed");
+  return sig;
 }

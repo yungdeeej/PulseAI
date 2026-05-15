@@ -221,8 +221,10 @@ export async function tradesPerHour(): Promise<number> {
 }
 
 export async function volumeUsd24h(): Promise<number> {
+  // Each trade row stores price_usd as the per-PULSE price at trade time.
+  // 24h volume = sum of pulse_amount × price_usd over the last 24 hours.
   const r = await queryOne<{ v: number }>(
-    `SELECT COALESCE(SUM(sol_amount * (SELECT price_sol FROM token_state WHERE id=1) * (SELECT price_usd / NULLIF(price_sol,0) FROM token_state WHERE id=1)), 0) AS v
+    `SELECT COALESCE(SUM(pulse_amount * price_usd), 0) AS v
        FROM trade_tape
        WHERE observed_at >= NOW() - INTERVAL '24 hours'`,
   );

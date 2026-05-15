@@ -97,8 +97,55 @@ Fee Sharing screen post-launch with the share percentages locked in
 - Jupiter quotes are still fetched, but tx submission is skipped.
 - DB writes still happen, so the dashboard shows simulated activity.
 - The `bot_config.dry_run` flag is synced from the env var on boot.
+- A synthetic price + trade generator runs in the background, walking the
+  market cap upward across every tier so demos can show the full lifecycle.
+  Speed it up with `DRY_RUN_TIME_SCALE=60` (1 real second ≈ 1 simulated minute).
 
 Use this for devnet runs and pre-launch demos.
+
+## Public HTTP API
+
+The same Express server that handles the Helius webhook also exposes the
+endpoints the dashboard uses. All write endpoints require a wallet signature.
+
+| Method | Path                              | Purpose |
+|--------|-----------------------------------|---------|
+| GET    | `/healthz`                        | Liveness |
+| POST   | `/helius/webhook`                 | Helius enhanced-tx ingest (auth via `HELIUS_WEBHOOK_SECRET`) |
+| GET    | `/votes/active`                   | Currently open Treasury Decision + live tally |
+| GET    | `/votes/:id`                      | Vote + tally by id (open or closed) |
+| POST   | `/votes`                          | Cast a vote (signed by wallet) |
+| POST   | `/tweets`                         | Submit a tweet URL for multiplier verification |
+| GET    | `/wallets/:wallet/conviction`     | Live preview of a wallet's vote weight |
+
+`POST /votes` body:
+```json
+{
+  "wallet": "<base58 pubkey>",
+  "voteId": "<uuid>",
+  "option": "Buy + Burn",
+  "ts": "2026-05-15T12:00:00.000Z",
+  "signature": "<base58 ed25519 signature>"
+}
+```
+The signed message is the canonical string `$PULSE vote {voteId} option={option} ts={ts}`.
+The bot rejects the call if `ts` is more than 10 minutes off, the option is
+not on the ballot, the vote is closed, the signature does not verify, or the
+wallet has zero conviction weight.
+
+## Bounty kinds
+
+The volume-bounty engine supports three bounty kinds out of the box:
+
+| Kind                | When it fires                                              |
+|---------------------|------------------------------------------------------------|
+| `NEXT_BIG_BUY`      | The next `BUY` ≥ `min_sol` SOL claims the entire reward   |
+| `FIRST_50K_HOLD`    | First wallet that has held ≥ `$min_balance_usd` for `duration_hours` |
+| `FIRST_5_BUYERS`    | First N (default 5) buyers each split the reward equally  |
+
+The default heuristic in `maybeOpenBounty()` opens a `NEXT_BIG_BUY` bounty
+during slow stretches; the team can also insert custom rows directly into
+`bounties`.
 
 ## Project layout
 

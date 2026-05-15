@@ -1,0 +1,16 @@
+run = "AUTO_MIGRATE=true pnpm install --prod=false && pnpm --filter @pulse/bot start"
+modules = ["nodejs-20"]
+hidden = [".pnpm-store", "node_modules", "dist"]
+
+[deployment]
+deploymentTarget = "vm"
+build = ["pnpm", "install", "--frozen-lockfile=false"]
+run = ["bash", "-c", "AUTO_MIGRATE=true pnpm --filter @pulse/bot build && pnpm --filter @pulse/bot start"]
+
+[env]
+NODE_ENV = "production"
+PORT = "3001"
+
+[[ports]]
+localPort = 3001
+externalPort = 80

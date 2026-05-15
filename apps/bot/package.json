@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@pulse/shared": "workspace:*",
+    "@solana/spl-token": "^0.4.8",
     "@solana/web3.js": "^1.95.2",
     "bs58": "^6.0.0",
     "express": "^4.19.2",
@@ -32,6 +33,7 @@
     "@types/node": "^20.14.10",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.11.6",
+    "pg-mem": "^3.0.14",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"

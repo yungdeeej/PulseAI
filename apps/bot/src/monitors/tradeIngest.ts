@@ -7,7 +7,10 @@ import {
   pricesInWindow,
   tradesPerHour,
   upsertHolderTrade,
+  volumeUsd24h,
 } from "../db/queries.js";
+import { evaluateBountyForTrade } from "../actions/bounty.js";
+import { isBotWallet } from "../integrations/botWallets.js";
 import { evaluateTierTransition } from "../actions/tier.js";
 import { updateStreakOnTrade } from "../features/streak.js";
 import { logger } from "../utils/logger.js";
@@ -31,6 +34,7 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
   if (t.pulseAmount <= 0 || t.solAmount <= 0) return;
   const priceUsdEst = await estimatePriceUsd(t);
 
+  const botInitiated = (t.botInitiated ?? false) || isBotWallet(t.wallet);
   const inserted = await insertTrade({
     signature: t.signature,
     wallet: t.wallet,
@@ -38,7 +42,7 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
     solAmount: t.solAmount,
     pulseAmount: t.pulseAmount,
     priceUsd: priceUsdEst,
-    botInitiated: t.botInitiated ?? false,
+    botInitiated,
     observedAt: t.observedAt,
   });
   if (!inserted) {
@@ -50,10 +54,14 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
   await upsertHolderTrade(t.wallet, delta, t.observedAt);
 
   const tph = await tradesPerHour();
+  const vol24h = await volumeUsd24h();
+  const supply = Number(process.env.PULSE_TOTAL_SUPPLY ?? 1_000_000_000);
   await patchTokenState({
     price_usd: priceUsdEst,
+    market_cap_usd: priceUsdEst * supply,
     trades_per_hour: tph,
     bpm: computeBpm(tph),
+    volume_24h_usd: vol24h,
   });
 
   // Reinforcement window: any buy during an active window counts.
@@ -66,8 +74,9 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
 
   await updateStreakOnTrade(t.wallet);
   await evaluateTierTransition(priceUsdEst);
+  await evaluateBountyForTrade({ wallet: t.wallet, side: t.side, solAmount: t.solAmount });
 
-  if (t.side === "BUY" && t.solAmount >= NOTABLE_BUY_SOL) {
+  if (t.side === "BUY" && t.solAmount >= NOTABLE_BUY_SOL && !botInitiated) {
     const msg = `🐳 Notable buy: ${shortAddress(t.wallet)} bought ${formatUsd(
       t.solAmount * (await solUsd()),
     )} of $PULSE (${formatSol(t.solAmount)}).`;

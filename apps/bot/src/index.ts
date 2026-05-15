@@ -8,9 +8,11 @@ import { mmTick } from "./actions/marketMaker.js";
 import { startVolumeGenerator, stopVolumeGenerator } from "./actions/volumeGenerator.js";
 import { distributeWeeklyRewards } from "./actions/rewards.js";
 import { tickClosingVotes } from "./voting/tallyVote.js";
+import { recordPriceSample } from "./monitors/priceTracker.js";
+import { startDryRunGenerator, stopDryRunGenerator } from "./monitors/dryRunGenerator.js";
 import { recomputeAllStreaks } from "./features/streak.js";
 import { pollTweetEngagements } from "./features/tweetMultiplier.js";
-import { maybeOpenBounty } from "./actions/bounty.js";
+import { evaluateHoldBounties, maybeOpenBounty } from "./actions/bounty.js";
 import {
   BETTERSTACK_PING_MS,
   BOT_CONFIG_POLL_MS,
@@ -88,6 +90,9 @@ async function main() {
   // 6. Volume bot (self-scheduling)
   startVolumeGenerator();
 
+  // 6b. Dry-run synthetic data (no-op when DRY_RUN=false)
+  startDryRunGenerator();
+
   // 7. Heartbeat
   timers.push(
     setInterval(() => {
@@ -100,9 +105,15 @@ async function main() {
   cron.schedule("* * * * *", () => {
     tickClosingVotes().catch((err) => logger.error({ err }, "vote close tick failed"));
   });
+  // Price sample — every minute (gives the defense bot continuous data even
+  // when no trades are landing).
+  cron.schedule("* * * * *", () => {
+    recordPriceSample().catch((err) => logger.warn({ err }, "price sample failed"));
+  });
   // Bounty engine — every 5 minutes
   cron.schedule("*/5 * * * *", () => {
     maybeOpenBounty().catch((err) => logger.warn({ err }, "bounty engine failed"));
+    evaluateHoldBounties().catch((err) => logger.warn({ err }, "hold bounty eval failed"));
   });
   // Tweet engagement poll — hourly
   cron.schedule("0 * * * *", () => {
@@ -126,6 +137,7 @@ function registerShutdown() {
     logger.info("shutting down…");
     for (const t of timers) clearInterval(t);
     stopVolumeGenerator();
+    stopDryRunGenerator();
     await pool.end().catch(() => {});
     process.exit(0);
   };

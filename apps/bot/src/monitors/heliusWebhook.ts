@@ -3,10 +3,12 @@ import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { processTradeEvent, type ParsedTrade } from "./tradeIngest.js";
+import { mountPublicApi } from "../api/publicApi.js";
 
 export function createWebhookApp() {
   const app = express();
   app.use(express.json({ limit: "5mb" }));
+  mountPublicApi(app);
 
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, dry_run: env.DRY_RUN, network: env.NETWORK });
