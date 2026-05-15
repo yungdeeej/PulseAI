@@ -1,0 +1,549 @@
+You are building the orchestration bot and database backend for $PULSE 
+— a Solana memecoin launching on pump.fun with reactive treasury 
+mechanics. Your job is the bot that monitors trades, manages five 
+treasury vaults, executes community-decided actions, and writes 
+everything to Supabase for the dashboard to display.
+
+═══════════════════════════════════════════════════════════════════
+PROJECT CONTEXT
+═══════════════════════════════════════════════════════════════════
+
+The token itself is a vanilla pump.fun bonding-curve launch with 
+authorities renounced — you are NOT writing a smart contract. The 
+"reactivity" comes from your bot, which controls five fee-routing 
+wallets configured via pump.fun's Creator Fee Sharing feature 
+(Jan 2026 release).
+
+You are NOT building the dashboard. You are building the bot that 
+writes to Supabase; the dashboard reads from Supabase.
+
+═══════════════════════════════════════════════════════════════════
+LOCKED PROJECT CONFIG
+═══════════════════════════════════════════════════════════════════
+
+Token name:         $PULSE
+Chain:              Solana
+Launchpad:          pump.fun
+Initial buy:        2 SOL (creator)
+Total supply:       1,000,000,000
+Decimals:           6
+
+Vault split (Creator Fee Sharing):
+  Decision Vault:   35%  (funds Treasury Decisions at tier crossings)
+  Defense Vault:    30%  (defense triggers + market maker capital)
+  Rewards Vault:    25%  (weekly rewards starting Tier 3)
+  Liquidity Vault:   5%  (LP additions post-graduation)
+  Operations Vault:  5%  (bot costs, infrastructure)
+
+Tier thresholds (USD market cap):
+  Tier 0 DISCOVERY:   $0       - $69K     (bonding curve)
+  Tier 1 IGNITION:    $69K     - $300K    (snapshot ≥50K → Pioneer)
+  Tier 2 MOMENTUM:    $300K    - $1M      (snapshot ≥100K → Believer)
+  Tier 3 CONVICTION:  $1M      - $5M      (snapshot ≥500K → Conviction)
+  Tier 4 ASCENSION:   $5M+               (snapshot ≥1M → Ascendant)
+
+Status multipliers (compound):
+  Pioneer:     +0.5x
+  Believer:    +0.25x
+  Conviction:  +0.25x
+  Ascendant:   +0.5x
+
+Hold-time multipliers:
+  <7 days:    1.0x
+  7-14 days:  1.5x
+  14-30 days: 2.0x
+  30+ days:   3.0x
+
+Defense trigger: -25% in 1 hour
+Defense cooldown: 2 hours
+Defense deploy: 30% of Defense Vault per trigger
+
+Conviction Score formula:
+  balance × hold_time_multiplier × tier_streak_bonus × reinforcement_bonus
+
+═══════════════════════════════════════════════════════════════════
+STACK
+═══════════════════════════════════════════════════════════════════
+
+Runtime:            Node.js 20 + TypeScript strict mode
+RPC:                Helius (primary) + QuickNode (fallback)
+Swap routing:       Jupiter Aggregator API v6
+MEV protection:     Jito bundles via jito-ts
+DB:                 Supabase Postgres
+Logging:            Pino structured logs
+Env validation:     Zod
+Notifications:      Twitter API v2, Telegram Bot API
+Scheduling:         node-cron
+Uptime monitoring:  Better Stack heartbeat ping
+
+DEPLOY: Replit Reserved VM (always-on, ~$7/month)
+
+═══════════════════════════════════════════════════════════════════
+PROJECT STRUCTURE
+═══════════════════════════════════════════════════════════════════
+
+apps/bot/
+├── src/
+│   ├── index.ts                    (main loop + cron + webhook server)
+│   ├── config/
+│   │   ├── env.ts                  (zod-validated env loading)
+│   │   ├── tiers.ts                (re-exports from shared)
+│   │   └── constants.ts
+│   ├── monitors/
+│   │   ├── heliusWebhook.ts        (Express endpoint for trade events)
+│   │   ├── priceTracker.ts         (writes to price_history)
+│   │   ├── stateSync.ts            (updates token_state every 30s)
+│   │   └── holderTracker.ts        (maintains first_seen_at per wallet)
+│   ├── actions/
+│   │   ├── tier.ts                 (tier transition handler)
+│   │   ├── defense.ts              (defense buyback)
+│   │   ├── marketMaker.ts          (active MM at Tier 2+)
+│   │   ├── rewards.ts              (weekly distribution at Tier 3+)
+│   │   ├── volumeGenerator.ts      (chart liquidity at Tier 0+)
+│   │   ├── decision.ts             (Treasury Decision execution)
+│   │   └── bounty.ts               (volume bounty engine)
+│   ├── integrations/
+│   │   ├── jupiter.ts              (swap quotes + execution)
+│   │   ├── jito.ts                 (bundle submission)
+│   │   ├── twitter.ts              (post wrapper)
+│   │   ├── telegram.ts             (post wrapper)
+│   │   ├── helius.ts               (RPC + price + holder fetches)
+│   │   └── birdeye.ts              (mcap + price cross-reference)
+│   ├── voting/
+│   │   ├── openVote.ts             (creates a Treasury Decision)
+│   │   ├── tallyVote.ts            (computes results with Conviction weight)
+│   │   ├── executeVote.ts          (deploys treasury per winning option)
+│   │   └── verifyWalletSig.ts      (validates vote signatures)
+│   ├── features/
+│   │   ├── reinforcement.ts        (defense participation tracking)
+│   │   ├── streak.ts               (Pulse Streak maintenance)
+│   │   ├── tweetMultiplier.ts      (Twitter API → multiplier bonus)
+│   │   └── snapshot.ts             (tier snapshot capture)
+│   ├── db/
+│   │   ├── supabase.ts             (service-role client)
+│   │   ├── queries.ts              (typed query wrappers)
+│   │   └── migrations.ts           (schema initialization helper)
+│   ├── utils/
+│   │   ├── math.ts                 (mcap, BPM, multipliers, conviction)
+│   │   ├── format.ts               (number/address formatters)
+│   │   ├── retry.ts                (exponential backoff)
+│   │   ├── logger.ts               (pino instance)
+│   │   └── timewindow.ts           (rolling window helpers)
+│   └── types/
+│       └── index.ts                (re-exports from packages/shared)
+├── tests/
+│   ├── tier.test.ts                (every threshold boundary)
+│   ├── defense.test.ts             (-25% trigger logic + cooldown)
+│   ├── rewards.test.ts             (multiplier math + distribution)
+│   ├── conviction.test.ts          (Conviction Score formula)
+│   ├── vote.test.ts                (vote weight + tally)
+│   └── snapshot.test.ts            (snapshot eligibility)
+├── package.json
+├── tsconfig.json
+├── .env.example
+└── README.md
+
+═══════════════════════════════════════════════════════════════════
+CORE RESPONSIBILITIES
+═══════════════════════════════════════════════════════════════════
+
+1. MONITORING (continuous)
+   - Express server on port 3001 listens for Helius webhook POSTs
+   - On every $PULSE trade event:
+     • Insert row into price_history
+     • Insert row into trade_tape (last 500 retained)
+     • Recompute trades_per_hour (rolling 60-min window)
+     • Update holder_balances (incremental)
+     • Update token_state (price, mcap, holder count, volume_24h, BPM)
+     • Check tier — if changed, trigger executeTierTransition()
+     • Check streaks — update or break for affected wallets
+     • Check reinforcement window — log participation if active
+   - Separate setInterval every 30s for state sync fallback
+   - Both webhook and polling paths feed the same update functions
+
+2. TIER MANAGEMENT
+   When mcap crosses into a new tier:
+     a) Insert into tier_history (irreversible)
+     b) Execute snapshot of qualifying wallets
+     c) Insert status flags (Pioneer / Believer / Conviction / 
+        Ascendant) into wallet_status table
+     d) Open new Treasury Decision vote (see Voting section)
+     e) Update bot_config (enable defense at Tier 2, enable rewards 
+        at Tier 3, etc.)
+     f) Post tier crossing announcement to Twitter and Telegram
+     g) Log to bot_activity with TIER_UNLOCK kind
+
+3. DEFENSE BOT (only when bot_config.defense_enabled = true, 
+   typically from Tier 2 onwards)
+   - Every 60 seconds, query price_history for last 1 hour
+   - Compute % change from oldest sample to newest
+   - If change ≤ -25% AND no defense in last 2 hours:
+     • Quote Jupiter for SOL → $PULSE swap
+     • Build versioned transaction
+     • Submit via Jito bundle (priority fee + tip)
+     • Use 30% of Defense Vault balance
+     • Insert into defense_log
+     • Insert into bot_activity (DEFENSE kind)
+     • Open a 30-min "reinforcement window" — any wallet that 
+       buys during this window gets logged in reinforcement_log
+     • Post to Twitter: "🛡️ Defense triggered. -X% drop. 
+       Deployed Y SOL. Reinforcement window open for 30 min."
+     • Post to Telegram
+
+4. ACTIVE MARKET MAKER (Tier 2+ when bot_config.mm_enabled)
+   - Maintains buy walls at -2%, -5%, -10% below current price 
+     using Defense Vault funds
+   - Maintains sell walls at +3%, +7%, +15% above current price 
+     using held $PULSE inventory
+   - Spreads of 1-2%
+   - LP fees earned flow into Decision Vault
+   - Public state displayed on dashboard (mm_state table 
+     updated every 60s)
+   - On large dump events, MM walls absorb naturally
+
+5. VOLUME GENERATOR (Tier 0+ when bot_config.volume_gen_enabled)
+   - Small bot trades at random intervals (every 10-30 min)
+   - Trade size: 0.05 to 0.2 SOL
+   - Purpose: chart liquidity for Dexscreener visibility
+   - Funded from Operations Vault
+   - Transparent — flagged in trade_tape as bot_initiated=true
+   - Disclosed publicly on /transparency page
+
+6. WEEKLY REWARDS (Tier 3+ only)
+   - Cron: Sundays 00:00 UTC
+   - Query all $PULSE holders via Helius getTokenAccounts
+   - For each holder:
+     • Look up first_seen_at from holder_balances
+     • Compute hold_days
+     • Apply hold-time multiplier
+     • Apply tier-status multipliers (compound)
+     • Apply reinforcement bonus (capped at +0.5x)
+     • Apply tweet multiplier bonus if active
+   - Filter: balance ≥ 100,000 AND hold_days ≥ 3
+   - Compute weighted shares
+   - Distribute Rewards Vault SOL proportionally
+   - Batch send via versioned transactions (20 per tx, 
+     parallelized)
+   - Insert summary into bot_activity
+   - Post recap to Twitter + Telegram
+
+7. TREASURY DECISIONS (the killer feature)
+   At each tier crossing:
+   a) openVote() creates a new active_votes row with:
+      - tier_id reference
+      - vote_options array (configurable per tier, see below)
+      - opens_at, closes_at (72 hours from now)
+      - decision_pool_sol (snapshotted Decision Vault balance)
+      - status = 'open'
+   b) Vote collection via dashboard:
+      - Holders sign a message with their wallet
+      - Bot verifies signature
+      - Inserts into vote_records with conviction_weight
+   c) tallyVote() runs continuously while vote is open
+   d) When closes_at reached:
+      - Compute final tally weighted by Conviction Score
+      - Set vote.status = 'closed', vote.winning_option = X
+      - executeVote() deploys treasury per winning option
+   e) Vote options per tier (configurable):
+      Tier 1: ["Buy + Burn", "Hold & Compound"]
+      Tier 2: ["Buy + Burn", "Reinforce MM", "Hold"]
+      Tier 3: ["Buy + Burn", "Holder Airdrop", "Reinforce MM", 
+               "Treasury Trade", "Pulse Wars", "Hold"]
+      Tier 4: ["Buy + Burn", "Holder Airdrop", "Reinforce MM", 
+               "Treasury Trade", "Pulse Wars", "Permanent Strategy"]
+
+8. EXECUTION OF VOTE OUTCOMES
+   Each vote option maps to an executor function:
+   - Buy + Burn: Jupiter swap SOL → $PULSE → send to incinerator
+   - Holder Airdrop: distribute proportionally to qualifying holders 
+     weighted by Conviction Score (similar to weekly rewards but 
+     larger)
+   - Reinforce MM: deposit funds into Defense Vault, increasing 
+     buy wall depth
+   - Treasury Trade: deploy into a specific memecoin (team specifies 
+     target before vote opens)
+   - Pulse Wars: buy supply of a competing memecoin and burn it
+   - Hold: do nothing, funds compound to next tier
+   - All execution logged to bot_activity
+
+9. PULSE STREAKS
+   - Maintained per wallet in streaks table
+   - On every trade affecting a wallet:
+     • If balance dropped below their tier threshold → break streak
+     • If balance still above threshold → increment streak day
+   - Daily cron at 00:00 UTC: recalculate all active streaks
+   - Top 10 active streaks exposed to dashboard
+
+10. REINFORCEMENT TRACKING
+    - When defense triggers, open reinforcement_window record 
+      (30 min)
+    - Any buy during that window for that wallet:
+      • Insert into reinforcement_log
+      • Increment wallet's reinforcement_count
+      • Update conviction_bonus
+    - Reinforcement bonus formula: +0.1x per reinforcement, 
+      capped at +0.5x
+
+11. VOLUME BOUNTIES
+    - Bot opens bounties at intelligent moments (low volume 
+      stretches, post-defense recovery)
+    - Bounty types:
+      a) "Next wallet to buy ≥X SOL gets Y SOL refund"
+      b) "First wallet to hold ≥$50K for 24h gets +5x multiplier 
+         this week"
+      c) "First 5 buyers in next 10 min get bonus reinforcement 
+         status"
+    - Inserted into bounties table with conditions, expiry, 
+      reward_sol
+    - Dashboard displays active bounty
+    - On condition met: execute reward, mark bounty as fulfilled
+
+12. TWEET → MULTIPLIER SYSTEM
+    - Holder submits tweet URL via dashboard endpoint
+    - Bot verifies tweet via Twitter API: mentions $PULSE, 
+      author follows project, posted in last 24h
+    - Bot polls tweet engagement every hour
+    - When tweet hits >100 likes: award +0.25x multiplier to 
+      author's wallet for 7 days
+    - Stored in tweet_multipliers table with expires_at
+    - Dashboard shows pending and active bonuses per wallet
+
+13. NOTIFICATIONS
+    Twitter posts on:
+      - Tier crossings (always)
+      - Defense triggers (always, with reinforcement window 
+        callout)
+      - Vote opening (always, with options + countdown)
+      - Vote closing / execution (always)
+      - Weekly reward summary (always at Tier 3+)
+      - Bounty opening + fulfillment (always)
+      - Notable buys (>5 SOL single trade)
+    Telegram (same events + every action regardless of size, 
+    higher frequency)
+    Dashboard updates: via Supabase Realtime (automatic from 
+    bot_activity INSERTs)
+
+═══════════════════════════════════════════════════════════════════
+SAFETY & RELIABILITY
+═══════════════════════════════════════════════════════════════════
+
+- Hot wallet hard limit: max 5 SOL per single transaction
+- Daily transaction value cap: MAX_DAILY_SOL_DEPLOYED env var, 
+  default 50 SOL. Cumulative deploy across all action types. Bot 
+  refuses execution and logs to bot_activity for manual review 
+  if exceeded.
+- bot_config.paused flag: bot polls every 30s, halts all action 
+  loops if true (monitoring continues)
+- All swaps: 2% slippage cap, "confirmed" commitment before 
+  marking complete
+- On RPC error: retry 3x with exponential backoff (1s, 3s, 9s), 
+  then fallback to QuickNode
+- Better Stack heartbeat ping every 60s; alert if missed
+- All wallet private keys: encrypted env vars, never logged
+- Idempotent action handlers: re-execution of same action 
+  with same inputs is a no-op (dedup via tx_signature)
+
+═══════════════════════════════════════════════════════════════════
+DRY-RUN MODE
+═══════════════════════════════════════════════════════════════════
+
+When DRY_RUN=true:
+  - All actions log with "[DRY-RUN]" prefix
+  - No actual transactions submitted
+  - Supabase writes still happen (dashboard shows simulated 
+    activity)
+  - Twitter/Telegram posts replaced with console.log
+  - Generates synthetic price history for testing tier crossings
+  - Time can be accelerated via DRY_RUN_TIME_SCALE env var
+
+Used for:
+  - Devnet testing
+  - Local development
+  - Demo runs before mainnet launch
+
+═══════════════════════════════════════════════════════════════════
+DATABASE SCHEMA (Supabase Postgres)
+═══════════════════════════════════════════════════════════════════
+
+Provide a migration SQL file: 
+packages/db/migrations/001_initial_schema.sql
+
+Tables required:
+
+  token_state          (singleton, current snapshot)
+  bot_config           (singleton, control plane)
+  vaults               (5 rows, one per VaultKind)
+  bot_activity         (append-only, drives live feed)
+  price_history        (rolling 7 days, auto-pruned)
+  trade_tape           (last 500 trades, rolling)
+  holder_balances      (current state per wallet)
+  holder_snapshots     (tier-crossing snapshots, historical)
+  wallet_status        (Pioneer/Believer/Conviction/Ascendant flags)
+  tier_history         (append-only, every tier crossing)
+  defense_log          (cooldown tracker + history)
+  reinforcement_log    (defense participation by wallet)
+  streaks              (active streaks per wallet)
+  active_votes         (currently open Treasury Decision)
+  vote_records         (individual votes cast)
+  vote_history         (closed votes archive)
+  bounties             (active and historical)
+  tweet_multipliers    (active Twitter bonuses)
+  mm_state             (market maker state for dashboard display)
+
+Required:
+  - Enums: tier_enum, vault_kind_enum, activity_kind_enum, 
+    vote_status_enum
+  - UUID primary keys (gen_random_uuid()) except singletons
+  - Singletons enforce id=1 with CHECK constraint
+  - Indexes on all timestamp DESC columns
+  - Indexes on (wallet) where relevant for fast lookups
+  - Trigger to auto-prune price_history >7 days
+  - Trigger to maintain trade_tape size ≤500
+  - Row Level Security:
+    • Public SELECT on: token_state, vaults, bot_activity, 
+      holder_snapshots, tier_history, active_votes, vote_history, 
+      bounties, wallet_status, streaks, mm_state, trade_tape
+    • Private on: bot_config, price_history, defense_log, 
+      tweet_multipliers (sensitive), vote_records (signature data)
+  - Enable Supabase Realtime on: bot_activity, token_state, 
+    vaults, tier_history, active_votes, trade_tape
+
+═══════════════════════════════════════════════════════════════════
+ENV VARIABLES (.env.example with zod validation)
+═══════════════════════════════════════════════════════════════════
+
+# Solana RPC
+HELIUS_API_KEY=
+QUICKNODE_RPC_URL=
+NETWORK=mainnet-beta              # or "devnet"
+
+# Token
+PULSE_MINT_ADDRESS=               # set post-launch
+
+# Wallet keys (all base58, encrypted in production)
+BOT_WALLET_PRIVATE_KEY=
+BURN_VAULT_PRIVATE_KEY=
+DEFENSE_VAULT_PRIVATE_KEY=
+REWARDS_VAULT_PRIVATE_KEY=
+LIQUIDITY_VAULT_PRIVATE_KEY=
+OPERATIONS_VAULT_PRIVATE_KEY=
+
+# Vault public addresses (for verification/display)
+DECISION_VAULT_ADDRESS=
+DEFENSE_VAULT_ADDRESS=
+REWARDS_VAULT_ADDRESS=
+LIQUIDITY_VAULT_ADDRESS=
+OPERATIONS_VAULT_ADDRESS=
+
+# Trading infrastructure
+JUPITER_API_URL=https://quote-api.jup.ag/v6
+JITO_AUTH_KEYPAIR=
+JITO_BLOCK_ENGINE_URL=https://mainnet.block-engine.jito.wtf
+
+# Database
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+
+# Pricing
+BIRDEYE_API_KEY=
+
+# Social
+TWITTER_API_KEY=
+TWITTER_API_SECRET=
+TWITTER_ACCESS_TOKEN=
+TWITTER_ACCESS_SECRET=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHANNEL_ID=
+
+# Monitoring
+BETTERSTACK_HEARTBEAT_URL=
+
+# Operational
+DRY_RUN=false
+DRY_RUN_TIME_SCALE=1
+MAX_DAILY_SOL_DEPLOYED=50
+BOT_HOT_WALLET_MAX_BALANCE_SOL=5
+
+═══════════════════════════════════════════════════════════════════
+TESTS
+═══════════════════════════════════════════════════════════════════
+
+Minimum coverage:
+- tier.test.ts: every threshold boundary returns correct tier; 
+  tier transitions trigger correct actions
+- defense.test.ts: trigger fires at exactly -25%, not at -24.9%; 
+  respects 2h cooldown; opens reinforcement window correctly
+- rewards.test.ts: 30+ day holder gets 3x; sub-7-day gets 1x; 
+  total distribution sums to vault balance; multipliers compound
+- conviction.test.ts: Conviction Score formula correctly applies 
+  all multipliers; tier streak bonus increments correctly
+- vote.test.ts: vote weight = Conviction Score; tally aggregates 
+  correctly; winning option execution dispatches to right handler
+- snapshot.test.ts: only wallets meeting balance threshold at the 
+  exact crossing block are included; first_seen_at preserved
+
+═══════════════════════════════════════════════════════════════════
+DELIVERABLES
+═══════════════════════════════════════════════════════════════════
+
+1. Full TypeScript bot project, runnable via `pnpm dev`
+2. Supabase migration file ready to apply
+3. Devnet + mainnet configs both working
+4. README with:
+   - Local dev setup
+   - How to apply DB schema
+   - Replit Reserved VM deployment steps
+   - Vault wallet generation guide
+   - Helius webhook configuration
+   - Twitter API app setup
+   - Telegram bot setup
+5. Working DRY-RUN mode (full simulation without touching chain)
+6. All listed tests passing
+7. Pino structured logs ready for production observability
+
+═══════════════════════════════════════════════════════════════════
+WHAT NOT TO BUILD
+═══════════════════════════════════════════════════════════════════
+
+- The dashboard (separate agent)
+- Smart contracts (token is vanilla pump.fun)
+- Authentication system (wallet signatures only, for voting)
+- A custom RPC node
+- A frontend for the bot (Supabase IS the interface)
+- NFT minting infrastructure
+- Token burning at scheduled tiers (only via Treasury Decision votes)
+
+═══════════════════════════════════════════════════════════════════
+BUILD ORDER
+═══════════════════════════════════════════════════════════════════
+
+1. Project scaffold + TypeScript + zod env validation
+2. Supabase schema migration file
+3. Shared types (re-export from packages/shared)
+4. DB query wrappers
+5. Helius webhook server (monitoring only, no actions yet)
+6. Tier transition logic + snapshot system
+7. Defense bot (with dry-run testing)
+8. Active market maker (with dry-run testing)
+9. Volume generator
+10. Weekly rewards distributor
+11. Treasury Decision voting system (open, tally, execute)
+12. Reinforcement + streak tracking
+13. Volume bounty engine
+14. Tweet multiplier system
+15. Notifications (Twitter + Telegram)
+16. Safety layer (caps, pause, retries)
+17. Full integration test in DRY-RUN
+18. Devnet end-to-end test
+19. README + deployment runbook
+
+Begin with the scaffold, env validation, and Supabase migration. 
+Then build monitoring (Helius webhook + state sync) — verify it 
+captures live data correctly on devnet before adding any actions. 
+Then build actions one at a time, each in DRY-RUN first. Confirm 
+each milestone before moving on.
+
+If the user mentions they want changes to specific mechanics 
+(tier thresholds, multiplier values, vote options), confirm 
+those changes are made in BOTH the bot code AND packages/shared 
+to keep types in sync.
