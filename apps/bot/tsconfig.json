@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": false,
+    "declaration": false,
+    "isolatedModules": true,
+    "paths": {
+      "@pulse/shared": ["../../packages/shared/src/index.ts"],
+      "@pulse/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}
