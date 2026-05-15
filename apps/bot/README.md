@@ -33,22 +33,56 @@ Two options:
 Either way is idempotent — every `CREATE` uses `IF NOT EXISTS` or is wrapped
 in a `DO $$` block that catches `duplicate_object`.
 
-## Replit Reserved VM deployment
+## Replit deployment
 
-1. Create a Reserved VM ($7/mo). Point it at this repo.
-2. Add the Replit Hosted Postgres database to the VM. Replit injects
-   `DATABASE_URL` automatically.
-3. In Replit Secrets, paste the rest of `.env.example` (Helius key, vault
-   private keys, social tokens). All `*_PRIVATE_KEY` env vars stay in Secrets
-   only — never in the repo.
-4. Set the run command to:
-   ```bash
-   AUTO_MIGRATE=true pnpm --filter @pulse/bot start
-   ```
-   (Use `pnpm --filter @pulse/bot dev` for hot reload.)
-5. Configure the Helius webhook (next section).
-6. Add a Better Stack heartbeat and copy the URL into
-   `BETTERSTACK_HEARTBEAT_URL`. The bot pings every 60 s.
+### One-time setup
+
+1. **Import the repo into Replit.** The repo-level `.replit` already declares
+   `nodejs-20`, the entrypoint (`apps/bot/src/index.ts`), the run command, and
+   port forwarding (3001 → 80), so no manual config is needed.
+2. **Attach Replit Hosted Postgres.** Tools → Database → "Connect". Replit
+   injects `DATABASE_URL` into the Repl's env automatically. The bot's pool
+   detects that URL and enables SSL with `rejectUnauthorized: false`, which
+   is what Replit's Postgres requires.
+3. **Add Secrets** (Tools → Secrets), copying every var from
+   `apps/bot/.env.example` *except* `DATABASE_URL` (Replit already set that)
+   and `PORT` (the `.replit` file sets it). Required for boot: `HELIUS_API_KEY`.
+   Everything else can stay empty during dry-run.
+4. **Hit Run.** The IDE script does `pnpm install --prefer-offline` and
+   `AUTO_MIGRATE=true pnpm --filter @pulse/bot dev`. The bot:
+   - applies migrations (idempotent)
+   - waits up to ~30 s for the DB if it isn't ready yet
+   - starts the webhook + dashboard API on port 3001
+   - boots all monitors / cron jobs / dry-run generator
+5. **Test the public URL.** Replit forwards 3001 → 80. Browse to
+   `https://<repl>.<owner>.repl.co/healthz` and you should get
+   `{"ok":true,"dry_run":true,"network":"mainnet-beta"}`.
+
+### Going to production (Reserved VM)
+
+1. Tools → Deployments → New deployment → **Reserved VM** ($7/mo).
+2. Replit picks up the `[deployment]` block in `.replit`:
+   - **Build:** `corepack enable && pnpm install --frozen-lockfile`
+   - **Run:** `AUTO_MIGRATE=true pnpm --filter @pulse/bot start`
+   - `start` uses `tsx` directly (no separate build step). This works around
+     the TypeScript workspace path-alias issue cleanly and adds ~30 MB RSS —
+     negligible on a Reserved VM.
+3. The Reserved VM gets a stable public URL. Plug that URL into:
+   - **Helius webhook:** target `https://<deploy-url>/helius/webhook`,
+     authorization header set to `HELIUS_WEBHOOK_SECRET`.
+   - **Better Stack heartbeat:** copy URL into `BETTERSTACK_HEARTBEAT_URL`.
+     The bot pings every 60 s.
+4. Flip `DRY_RUN` to `false` in Secrets when the token is live.
+
+### Ports
+
+| Local | External | Purpose |
+|-------|----------|---------|
+| 3001  | 80       | Webhook ingest + dashboard API |
+
+The Express server binds explicitly to `0.0.0.0` so Replit's forwarder can
+reach it. If you change `PORT`, update the `[[ports]]` block in `.replit`
+to match.
 
 ## Vault wallet generation
 

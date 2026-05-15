@@ -1,16 +1,44 @@
-run = "AUTO_MIGRATE=true pnpm install --prod=false && pnpm --filter @pulse/bot start"
+# Replit configuration for the $PULSE orchestration bot.
+#
+# Run mode (clicking "Run" in the IDE):
+#   - installs deps once
+#   - applies migrations (idempotent)
+#   - boots the bot in dev (tsx watch) so edits hot-reload
+#
+# Reserved VM deployment:
+#   - same install + migrate + boot, but uses `pnpm start` (tsx, no watcher)
+#
+# Port 3001 (the Helius webhook + dashboard API listener) is forwarded
+# to the public URL on port 80, so the Helius webhook target is just
+# https://<your-repl>.<owner>.repl.co/helius/webhook (no port).
+
 modules = ["nodejs-20"]
-hidden = [".pnpm-store", "node_modules", "dist"]
+entrypoint = "apps/bot/src/index.ts"
+hidden = [".pnpm-store", "node_modules", "dist", ".replit_history"]
+
+run = "pnpm install --prefer-offline && AUTO_MIGRATE=true pnpm --filter @pulse/bot dev"
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+NODE_ENV = "development"
+PORT = "3001"
+AUTO_MIGRATE = "true"
 
 [deployment]
 deploymentTarget = "vm"
-build = ["pnpm", "install", "--frozen-lockfile=false"]
-run = ["bash", "-c", "AUTO_MIGRATE=true pnpm --filter @pulse/bot build && pnpm --filter @pulse/bot start"]
+build = ["bash", "-c", "corepack enable && pnpm install --frozen-lockfile"]
+run  = ["bash", "-c", "AUTO_MIGRATE=true pnpm --filter @pulse/bot start"]
 
-[env]
+[deployment.env]
 NODE_ENV = "production"
 PORT = "3001"
 
 [[ports]]
 localPort = 3001
 externalPort = 80
+exposeLocalhost = false
+
+[unitTest]
+language = "nodejs"

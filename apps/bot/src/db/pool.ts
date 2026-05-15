@@ -10,10 +10,18 @@ import { logger } from "../utils/logger.js";
 pg.types.setTypeParser(1700 /* NUMERIC */, (v) => (v === null ? null : Number(v)));
 pg.types.setTypeParser(20 /* INT8 */, (v) => (v === null ? null : Number(v)));
 
-const ssl =
-  /sslmode=require|\.replit\.dev|\.neon\.tech|\.supabase\.co/.test(env.DATABASE_URL ?? "")
-    ? { rejectUnauthorized: false }
-    : undefined;
+/**
+ * SSL is required by every hosted Postgres provider we'll realistically
+ * connect to (Replit Hosted Postgres, Neon, Supabase, Render, RDS, …).
+ * Only disable it for plain localhost/127.0.0.1 dev URLs.
+ *
+ * `rejectUnauthorized: false` mirrors Replit's docs — their Postgres uses
+ * a CA chain that's not in Node's default bundle.
+ */
+const url = env.DATABASE_URL ?? "";
+const isLocal = /(@localhost|@127\.0\.0\.1|@\[?::1\]?)/.test(url);
+const sslDisabledByQuery = /sslmode=disable/.test(url);
+const ssl = isLocal || sslDisabledByQuery ? undefined : { rejectUnauthorized: false };
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,

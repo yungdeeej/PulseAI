@@ -25,6 +25,7 @@ import { applyMigrations } from "./db/migrations.js";
 import { syncDryRunFlag } from "./utils/safety.js";
 import { getBotConfig } from "./db/queries.js";
 import { pool } from "./db/pool.js";
+import { sleep } from "./utils/retry.js";
 
 const timers: NodeJS.Timeout[] = [];
 let paused = false;
@@ -42,14 +43,16 @@ async function main() {
   );
 
   if (process.env.AUTO_MIGRATE === "true") {
+    await waitForDb();
     await applyMigrations();
   }
   await syncDryRunFlag();
 
-  // 1. HTTP server (Helius webhook + health)
+  // 1. HTTP server (Helius webhook + health). Bind 0.0.0.0 so Replit's
+  // port forwarder can reach us — localhost-only binds get a blank page.
   const app = createWebhookApp();
   const port = Number(env.PORT ?? 3001);
-  app.listen(port, () => logger.info({ port }, "webhook listener ready"));
+  app.listen(port, "0.0.0.0", () => logger.info({ port }, "webhook listener ready"));
 
   // 2. Pause flag poller
   timers.push(
@@ -130,6 +133,26 @@ async function main() {
 
   registerShutdown();
   logger.info("pulse bot online");
+}
+
+/**
+ * On Replit Reserved VMs the Postgres sidecar can take a few seconds to
+ * accept connections after the container starts. We give it up to ~30 s
+ * before declaring boot a failure.
+ */
+async function waitForDb(): Promise<void> {
+  const delays = [500, 1_000, 2_000, 4_000, 8_000, 16_000];
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      await pool.query("SELECT 1");
+      return;
+    } catch (err) {
+      const delay = delays[i];
+      if (delay === undefined) throw err;
+      logger.warn({ err: (err as Error).message, delay }, "db not ready yet — waiting");
+      await sleep(delay);
+    }
+  }
 }
 
 function registerShutdown() {
