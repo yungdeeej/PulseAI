@@ -166,7 +166,30 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
     textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace",
   };
 
-  // Hidden when no active vote — panel appears automatically when a vote goes live
+  // ── No active vote: show compact standby teaser ─────────────────────────────
+  if (!loading && !vote) {
+    return (
+      <div style={panelStyle}>
+        <div style={{ ...cardStyle, padding: "14px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={labelStyle}>Decision Protocol</div>
+            <div style={{
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+              letterSpacing: "0.16em", color: "rgba(140,190,230,0.35)",
+              border: "1px solid rgba(120,200,255,0.12)", borderRadius: 4, padding: "2px 8px",
+            }}>STANDBY</div>
+          </div>
+          <div style={{
+            marginTop: 10, fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10.5, color: "rgba(140,190,230,0.38)", letterSpacing: "0.12em",
+          }}>
+            AWAITING DECISION THRESHOLD // TIER 1 REQUIRED
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading || !vote) return null;
 
   const totalWeight = Object.values(tally).reduce((s, t) => s + Number(t.total_weight ?? 0), 0);
