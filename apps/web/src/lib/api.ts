@@ -25,6 +25,17 @@ export interface MarketActivity {
   price_change_1h: number;
 }
 
+export interface AIInsight {
+  id: number;
+  created_at: string;
+  headline: string;
+  commentary: string;
+  mood: string;
+  vote_lean: string | null;
+  vote_reason: string | null;
+  confidence: number;
+}
+
 export interface DashboardData {
   tokenState: TokenState | null;
   vaults: Vault[];
@@ -32,6 +43,16 @@ export interface DashboardData {
   change24h: number;
   creator_wallet_sol: number | null;
   market_activity: MarketActivity | null;
+  ai_insight: AIInsight | null;
+}
+
+export async function fetchConsciousness(limit = 8): Promise<{
+  latest: AIInsight | null;
+  recent: AIInsight[];
+}> {
+  const res = await fetch(`${BASE}/api/consciousness?limit=${limit}`);
+  if (!res.ok) throw new Error(`consciousness fetch failed: ${res.status}`);
+  return res.json();
 }
 
 export interface ActivityEvent {

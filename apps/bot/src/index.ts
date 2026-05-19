@@ -13,6 +13,7 @@ import { startDryRunGenerator, stopDryRunGenerator } from "./monitors/dryRunGene
 import { recomputeAllStreaks } from "./features/streak.js";
 import { pollTweetEngagements } from "./features/tweetMultiplier.js";
 import { evaluateHoldBounties, maybeOpenBounty } from "./actions/bounty.js";
+import { generateInsight } from "./features/aiConsciousness.js";
 import {
   BETTERSTACK_PING_MS,
   BOT_CONFIG_POLL_MS,
@@ -130,6 +131,13 @@ async function main() {
   cron.schedule("0 0 * * 0", () => {
     distributeWeeklyRewards().catch((err) => logger.error({ err }, "rewards failed"));
   });
+  // AI consciousness — every 15 minutes (plus one immediate run after boot)
+  cron.schedule("*/15 * * * *", () => {
+    generateInsight().catch((err) => logger.warn({ err }, "ai insight failed"));
+  });
+  setTimeout(() => {
+    generateInsight().catch((err) => logger.warn({ err }, "ai insight initial run failed"));
+  }, 20_000);
 
   registerShutdown();
   logger.info("pulse bot online");

@@ -4,6 +4,7 @@ import CursorOverlay from "./CursorOverlay";
 import { LeftPanels } from "./StatPanels";
 import RightPanels from "./ActivityFeed";
 import VotingPanel from "./VotingPanel";
+import ConsciousnessPanel from "./ConsciousnessPanel";
 import { useIsMobile } from "../lib/useIsMobile";
 
 export default function Dashboard() {
@@ -54,12 +55,14 @@ export default function Dashboard() {
             background: "linear-gradient(180deg, rgba(4,5,10,0) 0%, rgba(4,5,10,0.55) 35%, rgba(4,5,10,0.92) 80%)",
           }} />
           <LeftPanels mobile />
+          <ConsciousnessPanel mobile />
           <VotingPanel mobile />
           <RightPanels mobile />
         </div>
       ) : (
         <>
           <LeftPanels />
+          <ConsciousnessPanel />
           <VotingPanel />
           <RightPanels />
         </>

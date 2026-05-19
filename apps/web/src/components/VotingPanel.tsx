@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useVoting } from "../lib/useVoting";
 import { blobLive } from "../lib/blobLive";
-import { submitTweetUrl } from "../lib/api";
+import { submitTweetUrl, fetchConsciousness, type AIInsight } from "../lib/api";
 
 const OPTION_LABELS: Record<string, string> = {
   "Buy + Burn":         "BUY + BURN",
@@ -135,6 +135,20 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
   const [tweetUrl, setTweetUrl] = useState("");
   const [tweetState, setTweetState] = useState<"idle" | "submitting" | "pending" | "error">("idle");
   const [tweetError, setTweetError] = useState<string | null>(null);
+  const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    const load = async () => {
+      try {
+        const data = await fetchConsciousness(1);
+        if (!dead) setAiInsight(data.latest);
+      } catch { /* ignore */ }
+    };
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { dead = true; clearInterval(id); };
+  }, []);
 
   async function handleTweetSubmit() {
     if (!walletAddress || !tweetUrl.trim()) return;
@@ -255,11 +269,12 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
           {vote.options.map((opt) => {
             const row = tally[opt] ?? { total_weight: 0, count: 0 };
+            const aiLeans = aiInsight?.vote_lean === opt;
             return (
               <div
                 key={opt}
                 onClick={() => canVote && setSelected(opt)}
-                style={{ cursor: canVote ? "pointer" : "default" }}
+                style={{ cursor: canVote ? "pointer" : "default", position: "relative" }}
                 title={OPTION_DESC[opt]}
               >
                 <TallyBar
@@ -271,6 +286,21 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
                   myVote={myVote}
                   accent={accent}
                 />
+                {aiLeans && (
+                  <div style={{
+                    position: "absolute", top: -2, right: 4,
+                    padding: "1px 6px", borderRadius: 3,
+                    background: "rgba(220,180,255,0.14)",
+                    border: "1px solid rgba(220,180,255,0.45)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 8, letterSpacing: "0.16em",
+                    color: "rgb(220,180,255)",
+                    pointerEvents: "none",
+                    textShadow: "0 0 6px rgba(220,180,255,0.5)",
+                  }} title={aiInsight?.vote_reason ?? "AI consciousness leans here"}>
+                    ◆ AI LEAN
+                  </div>
+                )}
               </div>
             );
           })}

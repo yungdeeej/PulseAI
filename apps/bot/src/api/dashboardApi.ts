@@ -5,6 +5,7 @@ import { logger } from "../utils/logger.js";
 import { env } from "../config/env.js";
 import { fetchDexScreenerPrice, fetchDexScreenerHistory } from "../integrations/dexscreener.js";
 import { fetchWalletSolBalance } from "../integrations/solanaRpc.js";
+import { latestInsight, recentInsights, generateInsight } from "../features/aiConsciousness.js";
 
 export function mountDashboardApi(app: Express): void {
   app.get("/api/healthz", (_req, res) => {
@@ -17,11 +18,12 @@ export function mountDashboardApi(app: Express): void {
 
       const creatorWallet = env.CREATOR_WALLET_ADDRESS ?? null;
 
-      const [tokenState, vaults, livePrice, creatorWalletSol] = await Promise.all([
+      const [tokenState, vaults, livePrice, creatorWalletSol, aiInsight] = await Promise.all([
         getTokenState(),
         listVaults(),
         fetchDexScreenerPrice(),
         creatorWallet ? fetchWalletSolBalance(creatorWallet) : Promise.resolve(null),
+        latestInsight(),
       ]);
 
       // Fetch real OHLCV bar history using the pair address from DexScreener
@@ -72,9 +74,36 @@ export function mountDashboardApi(app: Express): void {
           price_change_5m: livePrice.price_change_5m,
           price_change_1h: livePrice.price_change_1h,
         } : null,
+        ai_insight: aiInsight,
       });
     } catch (err) {
       logger.warn({ err }, "dashboard api error");
+      res.status(500).json({ error: "internal error" });
+    }
+  });
+
+  app.get("/api/consciousness", async (req, res) => {
+    try {
+      const limit = Math.min(Number(req.query["limit"] ?? 10), 30);
+      const [latest, recent] = await Promise.all([latestInsight(), recentInsights(limit)]);
+      res.json({ latest, recent });
+    } catch (err) {
+      logger.warn({ err }, "consciousness api error");
+      res.status(500).json({ error: "internal error" });
+    }
+  });
+
+  app.post("/api/consciousness/refresh", async (req, res) => {
+    // Require admin secret to be configured AND match — never expose the
+    // endpoint when ADMIN_SECRET is unset.
+    if (!env.ADMIN_SECRET || req.header("x-admin-secret") !== env.ADMIN_SECRET) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    try {
+      const insight = await generateInsight();
+      res.json({ insight });
+    } catch (err) {
+      logger.warn({ err }, "manual insight refresh failed");
       res.status(500).json({ error: "internal error" });
     }
   });

@@ -17,6 +17,7 @@ const KIND_COLOR: Record<string, string> = {
   TRADE: "rgb(150,200,240)",
   SNAPSHOT: "rgb(160,170,255)",
   TIER_CROSS: "rgb(255,210,90)",
+  AI_INSIGHT: "rgb(220,180,255)",
 };
 
 export interface DashboardState extends DashboardData {
@@ -108,7 +109,11 @@ export function useDashboard(): DashboardState {
         // ── Apply emotion from live market activity ───────────────────────────
         if (data.market_activity) {
           const newEmotion = computeEmotion(data.market_activity);
-          blobLive.emotion = newEmotion;
+          // AI insight overrides market-derived emotion when fresh (<20m old).
+          const ai = data.ai_insight;
+          const aiFresh =
+            ai && Date.now() - new Date(ai.created_at).getTime() < 20 * 60_000;
+          blobLive.emotion = aiFresh ? ai!.mood : newEmotion;
 
           // Push a trade narrative event when something interesting happens
           // (only if the narrative text has changed to avoid repetitive spam)
@@ -147,7 +152,8 @@ export function useDashboard(): DashboardState {
         for (const ev of newEvents) {
           seenIds.current.add(ev.id);
           const color = KIND_COLOR[ev.kind] ?? "rgba(150,200,240,0.6)";
-          pushEvent("system", ev.summary, color);
+          const prefix = ev.kind === "AI_INSIGHT" ? "◆ AI :: " : "";
+          pushEvent("system", `${prefix}${ev.summary}`, color);
         }
       } catch {
       }

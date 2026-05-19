@@ -18,7 +18,8 @@ export type ActivityKind =
   | "TWEET_BONUS_AWARDED"
   | "NOTABLE_BUY"
   | "SAFETY_HALT"
-  | "DRY_RUN_NOTICE";
+  | "DRY_RUN_NOTICE"
+  | "AI_INSIGHT";
 
 export const ACTIVITY_KINDS: readonly ActivityKind[] = [
   "TIER_UNLOCK",
@@ -41,4 +42,5 @@ export const ACTIVITY_KINDS: readonly ActivityKind[] = [
   "NOTABLE_BUY",
   "SAFETY_HALT",
   "DRY_RUN_NOTICE",
+  "AI_INSIGHT",
 ] as const;
