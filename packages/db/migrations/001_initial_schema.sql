@@ -323,7 +323,7 @@ CREATE TRIGGER trg_cap_trade_tape
 CREATE OR REPLACE FUNCTION notify_row_change()
 RETURNS TRIGGER AS $$
 BEGIN
-  PERFORM pg_notify(TG_TABLE_NAME, COALESCE(NEW.id::text, ''));
+  PERFORM pg_notify(TG_TABLE_NAME, '');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

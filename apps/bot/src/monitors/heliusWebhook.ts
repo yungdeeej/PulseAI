@@ -5,10 +5,22 @@ import { logger } from "../utils/logger.js";
 import { processTradeEvent, type ParsedTrade } from "./tradeIngest.js";
 import { mountPublicApi } from "../api/publicApi.js";
 import { mountAdminApi } from "../api/adminApi.js";
+import { mountDashboardApi } from "../api/dashboardApi.js";
 
 export function createWebhookApp() {
   const app = express();
   app.use(express.json({ limit: "5mb" }));
+
+  // CORS — allows the Vite dev server (port 5000) to call the API (port 3001)
+  app.use((_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    if (_req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+
+  mountDashboardApi(app);
   mountPublicApi(app);
   mountAdminApi(app);
 
@@ -40,7 +52,6 @@ export function createWebhookApp() {
       }
     }
 
-    // Acknowledge fast; process in background.
     res.json({ ok: true, received: trades.length });
     for (const t of trades) {
       processTradeEvent(t).catch((err) =>
@@ -52,10 +63,6 @@ export function createWebhookApp() {
   return app;
 }
 
-/**
- * Helius "enhanced transactions" wrap swap details under tokenTransfers /
- * events.swap. We only care about trades that touch the $PULSE mint.
- */
 function parseHeliusEvent(event: unknown): ParsedTrade | null {
   if (!event || typeof event !== "object") return null;
   const e = event as Record<string, unknown>;

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "$PULSE orchestration bot + shared packages",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.26.1",
   "workspaces": [
     "apps/*",
     "packages/*"

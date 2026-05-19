@@ -241,9 +241,9 @@ export async function upsertHolderTrade(
 ): Promise<HolderBalance> {
   const row = await queryOne<HolderBalance>(
     `INSERT INTO holder_balances (wallet, balance, first_seen_at, updated_at)
-     VALUES ($1, GREATEST(0, $2), $3, $3)
+     VALUES ($1, GREATEST(0::numeric, $2::numeric), $3, $3)
      ON CONFLICT (wallet) DO UPDATE
-       SET balance = GREATEST(0, holder_balances.balance + $2),
+       SET balance = GREATEST(0::numeric, holder_balances.balance + $2::numeric),
            updated_at = $3
      RETURNING *`,
     [wallet, delta, observedAt],

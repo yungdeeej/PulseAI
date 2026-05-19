@@ -21,7 +21,7 @@ const numeric = (def?: number) =>
 const schema = z.object({
   NETWORK: z.enum(["mainnet-beta", "devnet"]).default("mainnet-beta"),
 
-  HELIUS_API_KEY: z.string().min(1, "HELIUS_API_KEY required"),
+  HELIUS_API_KEY: z.string().optional(),
   QUICKNODE_RPC_URL: z.string().url().optional(),
 
   PULSE_MINT_ADDRESS: z.string().optional(),

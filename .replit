@@ -1,18 +1,4 @@
-# Replit configuration for the $PULSE orchestration bot.
-#
-# Run mode (clicking "Run" in the IDE):
-#   - installs deps once
-#   - applies migrations (idempotent)
-#   - boots the bot in dev (tsx watch) so edits hot-reload
-#
-# Reserved VM deployment:
-#   - same install + migrate + boot, but uses `pnpm start` (tsx, no watcher)
-#
-# Port 3001 (the Helius webhook + dashboard API listener) is forwarded
-# to the public URL on port 80, so the Helius webhook target is just
-# https://<your-repl>.<owner>.repl.co/helius/webhook (no port).
-
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "python-3.11"]
 entrypoint = "apps/bot/src/index.ts"
 hidden = [".pnpm-store", "node_modules", "dist", ".replit_history"]
 
@@ -38,7 +24,53 @@ PORT = "3001"
 [[ports]]
 localPort = 3001
 externalPort = 80
-exposeLocalhost = false
+
+[[ports]]
+localPort = 5000
+externalPort = 80
 
 [unitTest]
 language = "nodejs"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Bot (backend)"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Bot (backend)"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm install --prefer-offline && AUTO_MIGRATE=true pnpm --filter @pulse/bot dev"
+waitForPort = 3001
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm install && pnpm --filter @pulse/web dev"
+waitForPort = 5000
+
+[agent]
+expertMode = true
