@@ -308,15 +308,23 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
               </div>
 
               {conviction === 0 && !alreadyVoted && (
-                <div style={{ ...infoRowStyle, color: "rgba(140,190,230,0.45)",
-                  whiteSpace: "normal", lineHeight: 1.6, letterSpacing: "0.12em",
-                  textIndent: "0.12em" }}>
-                  NO $PULSE DETECTED
-                  <span style={{ display: "block", fontSize: 9, marginTop: 3,
-                    color: "rgba(140,190,230,0.3)", letterSpacing: "0.10em",
-                    textIndent: "0.10em" }}>
-                    ACQUIRE $PULSE TO EARN VOTING WEIGHT
-                  </span>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "9px 12px",
+                  border: "1px solid rgba(120,200,255,0.08)", borderRadius: 8,
+                  background: "rgba(20,30,50,0.3)",
+                }}>
+                  <span style={{ color: "rgba(140,190,230,0.3)", fontSize: 13, lineHeight: 1 }}>◌</span>
+                  <div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+                      letterSpacing: "0.13em", color: "rgba(140,190,230,0.5)" }}>
+                      NO $PULSE DETECTED
+                    </div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5,
+                      letterSpacing: "0.10em", color: "rgba(140,190,230,0.28)", marginTop: 3 }}>
+                      ACQUIRE $PULSE TO EARN VOTING WEIGHT
+                    </div>
+                  </div>
                 </div>
               )}
 
