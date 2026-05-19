@@ -66,7 +66,8 @@ async function tick(): Promise<void> {
     const priceUsd = cursorMcap / supply;
     const priceSol = priceUsd / 150;
 
-    await insertPrice(priceUsd, priceSol, cursorMcap, "dryrun");
+    // Do NOT write to price_history — only real DexScreener prices go there.
+    // This keeps the sparkline clean and based on actual on-chain data.
     await patchTokenState({ price_usd: priceUsd, price_sol: priceSol, market_cap_usd: cursorMcap });
 
     // Occasionally fabricate a trade so the trade tape and holder balances move.

@@ -3,7 +3,7 @@ import { getTokenState, listVaults, pricesInWindow } from "../db/queries.js";
 import { pool } from "../db/pool.js";
 import { logger } from "../utils/logger.js";
 import { env } from "../config/env.js";
-import { fetchDexScreenerPrice } from "../integrations/dexscreener.js";
+import { fetchDexScreenerPrice, fetchDexScreenerHistory } from "../integrations/dexscreener.js";
 
 export function mountDashboardApi(app: Express): void {
   app.get("/api/healthz", (_req, res) => {
@@ -12,25 +12,37 @@ export function mountDashboardApi(app: Express): void {
 
   app.get("/api/dashboard", async (_req, res) => {
     try {
-      const [tokenState, vaults, prices, livePrice] = await Promise.all([
+      const supply = Number(env.PULSE_TOTAL_SUPPLY ?? 1_000_000_000);
+
+      const [tokenState, vaults, livePrice] = await Promise.all([
         getTokenState(),
         listVaults(),
-        pricesInWindow(60),
         fetchDexScreenerPrice(),
       ]);
 
-      const priceHistory = prices.map((p) => p.price_usd);
+      // Fetch real OHLCV bar history using the pair address from DexScreener
+      const mcapHistory = livePrice?.pair_address
+        ? await fetchDexScreenerHistory(livePrice.pair_address, supply, 1, 60)
+        : [];
 
-      // Use live DexScreener price when available — overrides whatever the
-      // dry-run random walk last wrote to the DB.
+      // Build sparkline from real price history — convert per-token price → market cap
+      const dbPrices = await pricesInWindow(60);
+      const dbMcapHistory = dbPrices.map((p) => p.price_usd * supply);
+
+      const priceHistory = mcapHistory.length >= 2
+        ? mcapHistory
+        : dbMcapHistory.length >= 2
+          ? dbMcapHistory
+          : [];
+
+      // Use live DexScreener price — overrides whatever the dry-run random walk wrote to DB
       const effectivePrice = livePrice?.price_usd ?? tokenState?.price_usd ?? null;
       const effectiveMcap  = livePrice?.market_cap_usd ?? tokenState?.market_cap_usd ?? null;
 
-      const price24hAgo = prices.length > 0 ? prices[0].price_usd : null;
+      const first = priceHistory[0] ?? null;
+      const last  = priceHistory[priceHistory.length - 1] ?? null;
       const change24h =
-        price24hAgo && effectivePrice && price24hAgo > 0
-          ? ((effectivePrice - price24hAgo) / price24hAgo) * 100
-          : 0;
+        first && last && first > 0 ? ((last - first) / first) * 100 : 0;
 
       const mintAddress = tokenState?.mint_address ?? env.PULSE_MINT_ADDRESS ?? null;
 
