@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchDashboard, fetchActivity, type DashboardData, type ActivityEvent } from "./api";
-import { pushEvent, activityFeed } from "./blobLive";
+import { fetchDashboard, fetchActivity, type DashboardData, type ActivityEvent, type MarketActivity } from "./api";
+import { pushEvent, activityFeed, blobLive } from "./blobLive";
 
 const DASHBOARD_POLL_MS = 15_000;
 const ACTIVITY_POLL_MS = 10_000;
@@ -29,13 +29,62 @@ const DEFAULT: DashboardState = {
   vaults: [],
   priceHistory: [],
   change24h: 0,
+  creator_wallet_sol: null,
+  market_activity: null,
   loading: true,
   error: null,
+};
+
+// ── Emotion engine ────────────────────────────────────────────────────────────
+// Maps live 5m buy/sell ratio + price change → blob emotion.
+// Written directly to blobLive so the canvas + ActivityFeed both react instantly.
+function computeEmotion(ma: MarketActivity): string {
+  const total5m = ma.buys_5m + ma.sells_5m;
+  if (total5m < 2) return "sleepy";
+  const buyRatio = ma.buys_5m / total5m;
+  const pc = ma.price_change_5m;
+  if (buyRatio > 0.70 && pc > 3)    return "excited";
+  if (buyRatio > 0.70 && pc > 0)    return "happy";
+  if (buyRatio > 0.58)              return "curious";
+  if (buyRatio < 0.30 && pc < -3)   return "shocked";
+  if (buyRatio < 0.42)              return "nervous";
+  if (total5m > 20)                 return "focused";
+  return "idle";
+}
+
+// Narrative events pushed into the activity feed when significant trades happen
+function narrativeEvent(ma: MarketActivity): string | null {
+  const total5m = ma.buys_5m + ma.sells_5m;
+  if (total5m < 2) return null;
+  const pc = ma.price_change_5m;
+  const sign = pc >= 0 ? "+" : "";
+
+  if (ma.buys_5m > ma.sells_5m * 2.5)
+    return `BUY SURGE // ${ma.buys_5m}B · ${ma.sells_5m}S · ${sign}${pc.toFixed(1)}% // entity energized`;
+  if (ma.sells_5m > ma.buys_5m * 2.5)
+    return `SELL WAVE // ${ma.sells_5m}S · ${ma.buys_5m}B · ${sign}${pc.toFixed(1)}% // entity alarmed`;
+  if (Math.abs(pc) > 4)
+    return `VOLATILE // ${sign}${pc.toFixed(1)}% swing · ${total5m} txns // entity watching`;
+  if (total5m > 30)
+    return `HIGH ACTIVITY // ${total5m} txns in 5m · ratio ${ma.buys_5m}:${ma.sells_5m}`;
+  return null;
+}
+
+const EMOTION_EVENT_COLOR: Record<string, string> = {
+  excited:  "rgb(255,120,210)",
+  happy:    "rgb(255,210,90)",
+  shocked:  "rgb(255,110,110)",
+  nervous:  "rgb(140,240,180)",
+  curious:  "rgb(160,170,255)",
+  focused:  "rgb(80,140,255)",
+  sleepy:   "rgb(170,130,210)",
+  idle:     "rgb(80,200,255)",
 };
 
 export function useDashboard(): DashboardState {
   const [state, setState] = useState<DashboardState>(DEFAULT);
   const seenIds = useRef(new Set<number>());
+  const lastNarrativeRef = useRef<string | null>(null);
 
   useEffect(() => {
     let destroyed = false;
@@ -43,7 +92,23 @@ export function useDashboard(): DashboardState {
     const loadDashboard = async () => {
       try {
         const data = await fetchDashboard();
-        if (!destroyed) setState((s) => ({ ...s, ...data, loading: false, error: null }));
+        if (destroyed) return;
+
+        // ── Apply emotion from live market activity ───────────────────────────
+        if (data.market_activity) {
+          const newEmotion = computeEmotion(data.market_activity);
+          blobLive.emotion = newEmotion;
+
+          // Push a trade narrative event when something interesting happens
+          // (only if the narrative text has changed to avoid repetitive spam)
+          const narrative = narrativeEvent(data.market_activity);
+          if (narrative && narrative !== lastNarrativeRef.current) {
+            lastNarrativeRef.current = narrative;
+            pushEvent("system", narrative, EMOTION_EVENT_COLOR[newEmotion]);
+          }
+        }
+
+        setState((s) => ({ ...s, ...data, loading: false, error: null }));
       } catch (err) {
         if (!destroyed) setState((s) => ({ ...s, loading: false, error: String(err) }));
       }

@@ -16,12 +16,22 @@ export interface Vault {
   address: string | null;
 }
 
+export interface MarketActivity {
+  buys_5m: number;
+  sells_5m: number;
+  buys_1h: number;
+  sells_1h: number;
+  price_change_5m: number;
+  price_change_1h: number;
+}
+
 export interface DashboardData {
   tokenState: TokenState | null;
   vaults: Vault[];
   priceHistory: number[];
   change24h: number;
   creator_wallet_sol: number | null;
+  market_activity: MarketActivity | null;
 }
 
 export interface ActivityEvent {

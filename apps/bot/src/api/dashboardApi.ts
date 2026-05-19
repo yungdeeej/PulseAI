@@ -64,6 +64,14 @@ export function mountDashboardApi(app: Express): void {
         priceHistory,
         change24h: +change24h.toFixed(2),
         creator_wallet_sol: creatorWalletSol,
+        market_activity: livePrice ? {
+          buys_5m:        livePrice.txns_5m_buys,
+          sells_5m:       livePrice.txns_5m_sells,
+          buys_1h:        livePrice.txns_1h_buys,
+          sells_1h:       livePrice.txns_1h_sells,
+          price_change_5m: livePrice.price_change_5m,
+          price_change_1h: livePrice.price_change_1h,
+        } : null,
       });
     } catch (err) {
       logger.warn({ err }, "dashboard api error");

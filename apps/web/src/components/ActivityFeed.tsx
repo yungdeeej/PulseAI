@@ -34,9 +34,20 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
   const visibleFeed = useMemo(() => activityFeed.slice(0, 14), [feedLen]);
 
   useEffect(() => {
-    const msgs = ["Containment :: nominal", "Telemetry :: stable", "Capacitor bank :: 99.4%",
-      "Field harmonics :: aligned", "Quantum link :: ACK", "Bio-signature :: persistent", "Cooling loop :: 22.4°C"];
-    const id = setInterval(() => pushEvent("system", msgs[Math.floor(Math.random() * msgs.length)]), 8000);
+    const msgs = [
+      "Containment field :: stable",
+      "Neural sync :: 99.4%",
+      "Monitoring liquidity depth",
+      "Scanning order flow",
+      "Wallet cluster analysis :: running",
+      "Bio-signature :: persistent",
+      "Mempool scan :: no anomalies",
+      "Holder distribution :: nominal",
+      "Smart money tracker :: active",
+      "Price oracle :: synced",
+      "On-chain sentiment :: processing",
+    ];
+    const id = setInterval(() => pushEvent("system", msgs[Math.floor(Math.random() * msgs.length)]), 12000);
     return () => clearInterval(id);
   }, []);
 

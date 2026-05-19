@@ -7,6 +7,12 @@ export interface DexScreenerPrice {
   market_cap_usd: number;
   volume_24h_usd: number;
   pair_address: string;
+  txns_5m_buys: number;
+  txns_5m_sells: number;
+  txns_1h_buys: number;
+  txns_1h_sells: number;
+  price_change_5m: number;
+  price_change_1h: number;
 }
 
 export async function fetchDexScreenerPrice(): Promise<DexScreenerPrice | null> {
@@ -29,6 +35,11 @@ export async function fetchDexScreenerPrice(): Promise<DexScreenerPrice | null> 
         fdv?: number;
         marketCap?: number;
         volume?: { h24?: number };
+        txns?: {
+          m5?: { buys?: number; sells?: number };
+          h1?: { buys?: number; sells?: number };
+        };
+        priceChange?: { m5?: number; h1?: number };
       }>;
     };
     const pair = data.pairs?.[0];
@@ -37,8 +48,18 @@ export async function fetchDexScreenerPrice(): Promise<DexScreenerPrice | null> 
     const price_sol = Number(pair.priceNative ?? 0);
     const market_cap_usd = Number(pair.marketCap ?? pair.fdv ?? 0);
     const volume_24h_usd = Number(pair.volume?.h24 ?? 0);
+    const txns_5m_buys  = Number(pair.txns?.m5?.buys  ?? 0);
+    const txns_5m_sells = Number(pair.txns?.m5?.sells ?? 0);
+    const txns_1h_buys  = Number(pair.txns?.h1?.buys  ?? 0);
+    const txns_1h_sells = Number(pair.txns?.h1?.sells ?? 0);
+    const price_change_5m = Number(pair.priceChange?.m5 ?? 0);
+    const price_change_1h = Number(pair.priceChange?.h1 ?? 0);
     if (!price_usd || !market_cap_usd) return null;
-    return { price_usd, price_sol, market_cap_usd, volume_24h_usd, pair_address: pair.pairAddress ?? "" };
+    return {
+      price_usd, price_sol, market_cap_usd, volume_24h_usd, pair_address: pair.pairAddress ?? "",
+      txns_5m_buys, txns_5m_sells, txns_1h_buys, txns_1h_sells,
+      price_change_5m, price_change_1h,
+    };
   } catch (err) {
     logger.warn({ err }, "dexscreener fetch error");
     return null;
