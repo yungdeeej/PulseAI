@@ -306,6 +306,27 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
           })}
         </div>
 
+        {/* AI consciousness lean — italicized first-person line */}
+        {aiInsight?.vote_lean && (
+          <div
+            title={aiInsight.vote_reason ?? undefined}
+            style={{
+              marginBottom: 12, padding: "8px 10px",
+              borderLeft: "2px solid rgba(220,180,255,0.55)",
+              background: "rgba(220,180,255,0.06)",
+              borderRadius: "0 6px 6px 0",
+              fontStyle: "italic", fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 11.5, lineHeight: 1.45,
+              color: "rgba(230,220,255,0.86)",
+              letterSpacing: "0.01em",
+            }}
+          >
+            <span style={{ color: "rgb(220,180,255)" }}>◆</span>{" "}
+            I lean toward <em style={{ color: "rgb(220,180,255)", fontStyle: "italic" }}>{OPTION_LABELS[aiInsight.vote_lean] ?? aiInsight.vote_lean}</em>
+            {aiInsight.vote_reason ? ` — ${aiInsight.vote_reason}` : "."}
+          </div>
+        )}
+
         {/* Divider */}
         <div style={{ borderTop: "1px solid rgba(120,200,255,0.08)", paddingTop: 12 }}>
 

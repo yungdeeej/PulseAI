@@ -84,7 +84,11 @@ export function mountDashboardApi(app: Express): void {
 
   app.get("/api/consciousness", async (req, res) => {
     try {
-      const limit = Math.min(Number(req.query["limit"] ?? 10), 30);
+      const rawLimit = Number(req.query["limit"]);
+      const limit = Math.min(
+        Math.max(1, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 10),
+        30,
+      );
       const [latest, recent, memories] = await Promise.all([
         latestInsight(),
         recentInsights(limit),
