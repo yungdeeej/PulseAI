@@ -38,22 +38,36 @@ export interface AIInsight {
 }
 
 const POSITIVE_REFRAME: Array<[RegExp, string]> = [
-  [/\bcrash(?:ing|ed)?\b/gi, "consolidation"],
-  [/\bdump(?:ing|ed)?\b/gi, "reset"],
+  [/\bcrash(?:ing|ed|es)?\b/gi, "consolidation"],
+  [/\bdump(?:ing|ed|s)?\b/gi, "reset"],
   [/\bbearish\b/gi, "patient"],
-  [/\bweak(?:ness)?\b/gi, "opportunity"],
+  [/\bweak(?:ness|er|est)?\b/gi, "opportunity"],
   [/\blosing\b/gi, "rebuilding"],
-  [/\bfear(?:ful)?\b/gi, "thoughtful"],
+  [/\bfear(?:ful|s)?\b/gi, "thoughtful"],
   [/\bdying\b/gi, "regenerating"],
   [/\bworried\b/gi, "watchful"],
   [/\bdesperate(?:ly)?\b/gi, "determined"],
-  [/\bpanic(?:king|ked)?\b/gi, "energised"],
+  [/\bpanic(?:king|ked|s)?\b/gi, "energised"],
+  [/\bfailing\b/gi, "evolving"],
+  [/\bstruggl(?:e|es|ing|ed)\b/gi, "working through"],
+  [/\bdoomed?\b/gi, "transforming"],
+  [/\bcollapse(?:d|s|ing)?\b/gi, "rebase"],
+  [/\bcrater(?:ed|ing|s)?\b/gi, "resetting"],
 ];
 
-function enforcePositivity(text: string): string {
+const NEGATIVE_DETECT = new RegExp(
+  POSITIVE_REFRAME.map(([re]) => re.source).join("|"),
+  "i",
+);
+
+function applySynonymPositivity(text: string): string {
   let t = text;
   for (const [re, rep] of POSITIVE_REFRAME) t = t.replace(re, rep);
   return t.trim();
+}
+
+function hasNegativeFraming(...parts: string[]): boolean {
+  return parts.some((p) => p && NEGATIVE_DETECT.test(p));
 }
 
 function clampMood(m: string): Mood {
@@ -336,35 +350,54 @@ export async function generateInsight(): Promise<AIInsight | null> {
     return null;
   }
 
-  let raw: RawInsight;
-  try {
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content:
-            "Here is my current lifecycle context. Reflect on it and produce the JSON insight.\n\n" +
-            JSON.stringify(ctx, null, 2),
-        },
-      ],
-    });
-    const content = completion.choices[0]?.message?.content ?? "{}";
-    raw = JSON.parse(content) as RawInsight;
-  } catch (err) {
-    logger.warn({ err: (err as Error).message }, "AI insight generation failed");
-    return null;
+  const userPrompt =
+    "Here is my current lifecycle context. Reflect on it and produce the JSON insight.\n\n" +
+    JSON.stringify(ctx, null, 2);
+
+  async function callModel(extra?: string): Promise<RawInsight | null> {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: MODEL,
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: extra ? `${userPrompt}\n\n${extra}` : userPrompt },
+        ],
+      });
+      const content = completion.choices[0]?.message?.content ?? "{}";
+      return JSON.parse(content) as RawInsight;
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, "AI insight generation failed");
+      return null;
+    }
   }
 
-  const headline = enforcePositivity(String(raw.headline ?? "").slice(0, 200));
-  const commentary = enforcePositivity(String(raw.commentary ?? "").slice(0, 1200));
+  let raw = await callModel();
+  if (!raw) return null;
+
+  // Two-stage positivity guardrail:
+  //   1. Detect negative framing in the raw output.
+  //   2. If present, re-prompt the LLM ONCE to rewrite positively.
+  //   3. Apply synonym replacement as a final safety net.
+  if (hasNegativeFraming(raw.headline, raw.commentary, raw.vote_reason ?? "")) {
+    logger.info("AI insight had negative framing — re-prompting for positive rewrite");
+    const retry = await callModel(
+      "CORRECTION: your previous draft contained negative framing (words like crash, dump, bearish, weak, dying, etc.). Rewrite it in the same JSON shape with strictly positive, opportunity-framed language. Keep the same factual observations, only change the tone.",
+    );
+    if (retry && !hasNegativeFraming(retry.headline, retry.commentary, retry.vote_reason ?? "")) {
+      raw = retry;
+    } else if (retry) {
+      raw = retry; // best-effort; synonym pass below cleans up any residue
+    }
+  }
+
+  const headline = applySynonymPositivity(String(raw.headline ?? "").slice(0, 200));
+  const commentary = applySynonymPositivity(String(raw.commentary ?? "").slice(0, 1200));
   const mood = clampMood(String(raw.mood ?? "curious"));
   const voteLean =
     raw.vote_lean && ctx.active_vote?.options?.includes(raw.vote_lean) ? raw.vote_lean : null;
-  const voteReason = voteLean ? enforcePositivity(String(raw.vote_reason ?? "").slice(0, 280)) : null;
+  const voteReason = voteLean ? applySynonymPositivity(String(raw.vote_reason ?? "").slice(0, 280)) : null;
   const confidence = Math.max(0, Math.min(1, Number(raw.confidence ?? 0.5)));
 
   if (!headline || !commentary) {
@@ -384,7 +417,8 @@ export async function generateInsight(): Promise<AIInsight | null> {
   }
 
   // Mirror into bot_activity so it appears in the live feed alongside other events.
-  await logActivity("AI_INSIGHT", headline, {
+  // Prefix mirrors the on-frontend "ENTITY ANALYSIS" visual contract.
+  await logActivity("AI_INSIGHT", `ENTITY ANALYSIS // ${headline}`, {
     insight_id: inserted.id,
     mood,
     vote_lean: voteLean,
@@ -392,7 +426,7 @@ export async function generateInsight(): Promise<AIInsight | null> {
   });
 
   if (raw.memory && raw.memory.trim()) {
-    await recordMemory("INSIGHT", enforcePositivity(raw.memory.slice(0, 280)), 1);
+    await recordMemory("INSIGHT", applySynonymPositivity(raw.memory.slice(0, 280)), 1);
   }
 
   return {

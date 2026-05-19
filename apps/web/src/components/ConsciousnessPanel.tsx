@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchConsciousness, type AIInsight, type AIMemory } from "../lib/api";
 import { EMOTION_COLOR } from "../lib/blobLive";
 
@@ -14,11 +14,23 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function thinkingSince(iso: string): string {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diffDays = Math.floor((now - d.getTime()) / 86_400_000);
+  if (diffDays < 1) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 30) return `${diffDays}d`;
+  return d.toISOString().slice(0, 10);
+}
+
 export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolean } = {}) {
   const [latest, setLatest] = useState<AIInsight | null>(null);
   const [recent, setRecent] = useState<AIInsight[]>([]);
   const [memories, setMemories] = useState<AIMemory[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [arrivalPulse, setArrivalPulse] = useState(false);
+  const lastSeenIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let dead = false;
@@ -29,6 +41,18 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
         setLatest(data.latest);
         setRecent(data.recent ?? []);
         setMemories(data.memories ?? []);
+
+        // Auto-expand history + fire a one-shot gentle pulse when a NEW
+        // insight arrives (id changes from a previously-seen value).
+        if (data.latest && data.latest.id !== lastSeenIdRef.current) {
+          const isFirstSighting = lastSeenIdRef.current === null;
+          lastSeenIdRef.current = data.latest.id;
+          if (!isFirstSighting) {
+            setExpanded(true);
+            setArrivalPulse(true);
+            setTimeout(() => { if (!dead) setArrivalPulse(false); }, 2400);
+          }
+        }
       } catch {
         /* silent — panel just hides when no data */
       }
@@ -38,21 +62,28 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
     return () => { dead = true; clearInterval(id); };
   }, []);
 
+  // Earliest insight = last entry in `recent` (DESC order from API).
+  const firstSeenIso = recent.length > 0 ? recent[recent.length - 1]!.created_at : latest?.created_at;
+
   const accent = latest ? EMOTION_COLOR[latest.mood] ?? "rgb(220,180,255)" : "rgb(220,180,255)";
 
   const cardStyle: React.CSSProperties = {
     position: "relative",
     background:
       "linear-gradient(180deg, rgba(28,18,44,0.65), rgba(12,10,28,0.62))",
-    border: `1px solid ${accent}33`,
+    border: `1px solid ${arrivalPulse ? `${accent}99` : `${accent}33`}`,
     borderRadius: 10,
     padding: "14px 16px",
     backdropFilter: "blur(14px)",
     WebkitBackdropFilter: "blur(14px)",
-    boxShadow: `0 0 0 1px ${accent}14 inset, 0 18px 40px -18px ${accent}40`,
+    boxShadow: arrivalPulse
+      ? `0 0 0 1px ${accent}44 inset, 0 0 28px ${accent}55, 0 18px 40px -18px ${accent}80`
+      : `0 0 0 1px ${accent}14 inset, 0 18px 40px -18px ${accent}40`,
     overflow: "hidden",
     fontFamily: "'Inter', sans-serif",
     color: "#e7d9ff",
+    animation: arrivalPulse ? "consciousnessArrival 2.2s ease-out" : undefined,
+    transition: "border 0.6s ease, box-shadow 0.6s ease",
   };
 
   const labelStyle: React.CSSProperties = {
@@ -131,6 +162,16 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
           <span>MOOD :: {latest.mood.toUpperCase()}</span>
           <span>CONF :: {(latest.confidence * 100).toFixed(0)}%</span>
         </div>
+
+        {firstSeenIso && (
+          <div style={{
+            marginTop: 6,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+            color: `${accent}80`, letterSpacing: "0.18em",
+          }}>
+            ◇ THINKING SINCE :: {thinkingSince(firstSeenIso).toUpperCase()}
+          </div>
+        )}
 
         {latest.vote_lean && (
           <div style={{

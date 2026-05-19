@@ -29,3 +29,9 @@ html, body, #root {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* Gentle one-shot pulse when a new AI consciousness insight arrives. */
+@keyframes consciousnessArrival {
+  0%   { transform: scale(1.00); }
+  35%  { transform: scale(1.012); }
+  100% { transform: scale(1.00); }
+}

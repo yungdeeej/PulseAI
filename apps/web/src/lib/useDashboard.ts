@@ -166,8 +166,9 @@ export function useDashboard(): DashboardState {
         for (const ev of newEvents) {
           seenIds.current.add(ev.id);
           const color = KIND_COLOR[ev.kind] ?? "rgba(150,200,240,0.6)";
-          const prefix = ev.kind === "AI_INSIGHT" ? "◆ AI :: " : "";
-          pushEvent("system", `${prefix}${ev.summary}`, color);
+          // AI insight summaries already arrive prefixed with "ENTITY ANALYSIS // …"
+          // from the bot. Render as-is; styling differentiates them via colour.
+          pushEvent("system", ev.summary, color);
         }
       } catch {
       }
