@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchConsciousness, type AIInsight } from "../lib/api";
+import { fetchConsciousness, type AIInsight, type AIMemory } from "../lib/api";
 import { EMOTION_COLOR } from "../lib/blobLive";
 
 const POLL_MS = 30_000;
@@ -17,6 +17,7 @@ function timeAgo(iso: string): string {
 export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolean } = {}) {
   const [latest, setLatest] = useState<AIInsight | null>(null);
   const [recent, setRecent] = useState<AIInsight[]>([]);
+  const [memories, setMemories] = useState<AIMemory[]>([]);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
         if (dead) return;
         setLatest(data.latest);
         setRecent(data.recent ?? []);
+        setMemories(data.memories ?? []);
       } catch {
         /* silent — panel just hides when no data */
       }
@@ -163,7 +165,7 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
         )}
 
         {expanded && (
-          <div style={{ marginTop: 10, maxHeight: 260, overflowY: "auto" }}>
+          <div style={{ marginTop: 10, maxHeight: 320, overflowY: "auto" }}>
             {recent.slice(1).map((r) => {
               const c = EMOTION_COLOR[r.mood] ?? accent;
               return (
@@ -181,6 +183,31 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
                 </div>
               );
             })}
+
+            {memories.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px dashed ${accent}33` }}>
+                <div style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+                  letterSpacing: "0.2em", color: `${accent}aa`, marginBottom: 8,
+                }}>
+                  ◇ LONG-TERM MEMORY
+                </div>
+                {memories.map((m) => (
+                  <div key={m.id} style={{
+                    padding: "6px 0", fontSize: 10.5, lineHeight: 1.5,
+                    color: "rgba(230,220,255,0.72)",
+                  }}>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5,
+                      letterSpacing: "0.15em", color: `${accent}99`, marginRight: 6,
+                    }}>
+                      [{m.kind}]
+                    </span>
+                    {m.memory}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

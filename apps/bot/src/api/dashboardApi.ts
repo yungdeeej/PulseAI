@@ -5,7 +5,7 @@ import { logger } from "../utils/logger.js";
 import { env } from "../config/env.js";
 import { fetchDexScreenerPrice, fetchDexScreenerHistory } from "../integrations/dexscreener.js";
 import { fetchWalletSolBalance } from "../integrations/solanaRpc.js";
-import { latestInsight, recentInsights, generateInsight } from "../features/aiConsciousness.js";
+import { latestInsight, recentInsights, recentMemories, generateInsight } from "../features/aiConsciousness.js";
 
 export function mountDashboardApi(app: Express): void {
   app.get("/api/healthz", (_req, res) => {
@@ -85,8 +85,12 @@ export function mountDashboardApi(app: Express): void {
   app.get("/api/consciousness", async (req, res) => {
     try {
       const limit = Math.min(Number(req.query["limit"] ?? 10), 30);
-      const [latest, recent] = await Promise.all([latestInsight(), recentInsights(limit)]);
-      res.json({ latest, recent });
+      const [latest, recent, memories] = await Promise.all([
+        latestInsight(),
+        recentInsights(limit),
+        recentMemories(12),
+      ]);
+      res.json({ latest, recent, memories });
     } catch (err) {
       logger.warn({ err }, "consciousness api error");
       res.status(500).json({ error: "internal error" });

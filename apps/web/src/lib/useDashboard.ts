@@ -32,9 +32,21 @@ const DEFAULT: DashboardState = {
   change24h: 0,
   creator_wallet_sol: null,
   market_activity: null,
+  ai_insight: null,
   loading: true,
   error: null,
 };
+
+// A market signal is "strong" when raw 5m flow is decisive — it dominates
+// the AI mood. When neutral/weak, the AI consciousness gets to colour the blob.
+function marketIsStrong(ma: MarketActivity): boolean {
+  const total = ma.buys_5m + ma.sells_5m;
+  if (total < 8) return false;                              // not enough flow
+  const buyRatio = total > 0 ? ma.buys_5m / total : 0.5;
+  const decisive = buyRatio > 0.68 || buyRatio < 0.32;
+  const bigMove = Math.abs(ma.price_change_5m) > 3;
+  return decisive || bigMove;
+}
 
 // ── Emotion engine ────────────────────────────────────────────────────────────
 // Maps live 5m buy/sell ratio + price change → blob emotion.
@@ -109,11 +121,13 @@ export function useDashboard(): DashboardState {
         // ── Apply emotion from live market activity ───────────────────────────
         if (data.market_activity) {
           const newEmotion = computeEmotion(data.market_activity);
-          // AI insight overrides market-derived emotion when fresh (<20m old).
+          // Raw 5m flow wins when it's strong; AI mood biases the blob only
+          // when the market is neutral/quiet and the insight is fresh (<20m).
           const ai = data.ai_insight;
           const aiFresh =
             ai && Date.now() - new Date(ai.created_at).getTime() < 20 * 60_000;
-          blobLive.emotion = aiFresh ? ai!.mood : newEmotion;
+          const strong = marketIsStrong(data.market_activity);
+          blobLive.emotion = strong || !aiFresh ? newEmotion : ai!.mood;
 
           // Push a trade narrative event when something interesting happens
           // (only if the narrative text has changed to avoid repetitive spam)

@@ -46,9 +46,18 @@ export interface DashboardData {
   ai_insight: AIInsight | null;
 }
 
+export interface AIMemory {
+  id: number;
+  created_at: string;
+  kind: string;
+  memory: string;
+  weight: number;
+}
+
 export async function fetchConsciousness(limit = 8): Promise<{
   latest: AIInsight | null;
   recent: AIInsight[];
+  memories: AIMemory[];
 }> {
   const res = await fetch(`${BASE}/api/consciousness?limit=${limit}`);
   if (!res.ok) throw new Error(`consciousness fetch failed: ${res.status}`);

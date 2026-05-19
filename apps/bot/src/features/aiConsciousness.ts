@@ -71,10 +71,114 @@ async function loadMemories(limit = 20): Promise<{ memory: string; created_at: s
 }
 
 async function recordMemory(kind: string, memory: string, weight = 1): Promise<void> {
+  // Dedupe — never persist the same memory text twice
+  const existing = await pool.query<{ id: number }>(
+    `SELECT id FROM ai_memories WHERE memory = $1 LIMIT 1`,
+    [memory],
+  );
+  if ((existing.rowCount ?? 0) > 0) return;
   await pool.query(
     `INSERT INTO ai_memories (kind, memory, weight) VALUES ($1, $2, $3)`,
     [kind, memory, weight],
   );
+}
+
+export async function recentMemories(limit = 12): Promise<{
+  id: number; created_at: string; kind: string; memory: string; weight: number;
+}[]> {
+  const r = await pool.query<{
+    id: number; created_at: string; kind: string; memory: string; weight: number;
+  }>(
+    `SELECT id, created_at, kind, memory, weight::float8 AS weight
+       FROM ai_memories ORDER BY created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return r.rows;
+}
+
+function fmtMcap(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${Math.round(v)}`;
+}
+
+/**
+ * Scan the bot's lifecycle data for notable milestones since the last
+ * extraction and persist them as durable memories. Idempotent via the
+ * dedupe in recordMemory.
+ */
+export async function extractLifecycleMemories(): Promise<void> {
+  // 1) ATHs — pick the all-time max market cap in token_state vs price_history
+  const athR = await pool.query<{ ath: number }>(
+    `SELECT COALESCE(MAX(market_cap_usd), 0)::float8 AS ath FROM price_history`,
+  );
+  const ath = Number(athR.rows[0]?.ath ?? 0);
+  if (ath > 0) {
+    await recordMemory(
+      "MILESTONE",
+      `All-time-high market cap touched: ${fmtMcap(ath)}.`,
+      2,
+    );
+  }
+
+  // 2) Tier transitions
+  const tierR = await pool.query<{
+    from_tier: string | null; to_tier: string; market_cap_usd: number; occurred_at: string;
+  }>(
+    `SELECT from_tier, to_tier, market_cap_usd::float8 AS market_cap_usd, occurred_at
+       FROM tier_history ORDER BY occurred_at ASC LIMIT 25`,
+  );
+  for (const t of tierR.rows) {
+    const from = t.from_tier ?? "START";
+    await recordMemory(
+      "TIER",
+      `Crossed tier ${from} → ${t.to_tier} at ${fmtMcap(Number(t.market_cap_usd))}.`,
+      2,
+    );
+  }
+
+  // 3) Vote outcomes
+  const voteR = await pool.query<{
+    winning_option: string | null; closed_at: string; decision_pool_sol: number;
+  }>(
+    `SELECT winning_option, closed_at, decision_pool_sol::float8 AS decision_pool_sol
+       FROM vote_history WHERE winning_option IS NOT NULL
+       ORDER BY closed_at DESC LIMIT 10`,
+  );
+  for (const v of voteR.rows) {
+    await recordMemory(
+      "VOTE",
+      `Holders chose "${v.winning_option}" with ${Number(v.decision_pool_sol).toFixed(2)} SOL on the line.`,
+      1.5,
+    );
+  }
+
+  // 4) Defense triggers
+  const defR = await pool.query<{
+    drop_percent: number; sol_deployed: number; triggered_at: string;
+  }>(
+    `SELECT drop_percent::float8 AS drop_percent, sol_deployed::float8 AS sol_deployed, triggered_at
+       FROM defense_log ORDER BY triggered_at DESC LIMIT 5`,
+  );
+  for (const d of defR.rows) {
+    await recordMemory(
+      "DEFENSE",
+      `Defense engine deployed ${Number(d.sol_deployed).toFixed(3)} SOL after a ${Math.abs(Number(d.drop_percent)).toFixed(1)}% dip — turned reset into accumulation.`,
+      1.8,
+    );
+  }
+
+  // 5) Holder growth milestones (every 100/500/1000/5000/10000)
+  const hcR = await pool.query<{ c: number | null }>(
+    `SELECT holder_count AS c FROM token_state WHERE id = 1`,
+  );
+  const hc = Number(hcR.rows[0]?.c ?? 0);
+  const tiers = [10, 50, 100, 250, 500, 1_000, 5_000, 10_000, 25_000];
+  for (const t of tiers) {
+    if (hc >= t) {
+      await recordMemory("GROWTH", `Holder base broke past ${t.toLocaleString()}.`, 1.4);
+    }
+  }
 }
 
 async function loadRecentActivity(limit = 25) {
@@ -103,8 +207,33 @@ async function loadPriceWindow() {
   return out;
 }
 
+async function loadTierHistory() {
+  const r = await pool.query<{ from_tier: string | null; to_tier: string; occurred_at: string }>(
+    `SELECT from_tier, to_tier, occurred_at FROM tier_history
+     ORDER BY occurred_at ASC LIMIT 20`,
+  );
+  return r.rows;
+}
+
+async function loadDayTrajectory() {
+  // Hourly aggregates over the last 24h: trade count + buy/sell mix + price.
+  const r = await pool.query<{
+    hour: string; trades: number; buys: number; sells: number; avg_price: number;
+  }>(
+    `SELECT date_trunc('hour', observed_at)::text AS hour,
+            COUNT(*)::int                          AS trades,
+            COUNT(*) FILTER (WHERE side = 'BUY')::int  AS buys,
+            COUNT(*) FILTER (WHERE side = 'SELL')::int AS sells,
+            AVG(price_usd)::float8                 AS avg_price
+       FROM trade_tape
+      WHERE observed_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY 1 ORDER BY 1 ASC`,
+  );
+  return r.rows;
+}
+
 async function buildContext() {
-  const [tokenState, vaults, activeVote, memories, recentActivity, priceWindow] =
+  const [tokenState, vaults, activeVote, memories, recentActivity, priceWindow, tierHistory, dayTraj] =
     await Promise.all([
       getTokenState(),
       listVaults(),
@@ -112,6 +241,8 @@ async function buildContext() {
       loadMemories(),
       loadRecentActivity(),
       loadPriceWindow(),
+      loadTierHistory(),
+      loadDayTrajectory(),
     ]);
 
   return {
@@ -147,6 +278,18 @@ async function buildContext() {
     price_window: priceWindow.map((p) => ({
       p: Number(p.price_usd),
       t: p.observed_at,
+    })),
+    tier_history: tierHistory.map((t) => ({
+      from: t.from_tier,
+      to: t.to_tier,
+      at: t.occurred_at,
+    })),
+    day_trajectory: dayTraj.map((h) => ({
+      hour: h.hour,
+      trades: h.trades,
+      buys: h.buys,
+      sells: h.sells,
+      avg_price: Number(h.avg_price),
     })),
   };
 }
