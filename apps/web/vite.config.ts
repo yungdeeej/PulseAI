@@ -16,7 +16,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: parseInt(process.env.PORT ?? "20643"),
+    port: 5000,
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
@@ -40,7 +40,7 @@ export default defineConfig({
     },
   },
   preview: {
-    port: parseInt(process.env.PORT ?? "20643"),
+    port: 5000,
     host: "0.0.0.0",
     allowedHosts: true,
   },
