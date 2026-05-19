@@ -138,6 +138,7 @@ export interface ActiveVote {
   closes_at: string;
   status: VoteStatus;
   winning_option: VoteOption | null;
+  target_mint: string | null;
 }
 
 export interface VoteRecord {

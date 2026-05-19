@@ -152,6 +152,42 @@ endpoints the dashboard uses. All write endpoints require a wallet signature.
 | POST   | `/tweets`                         | Submit a tweet URL for multiplier verification |
 | GET    | `/wallets/:wallet/conviction`     | Live preview of a wallet's vote weight |
 
+### Admin endpoints
+
+All admin routes require `Authorization: Bearer $ADMIN_SECRET`. If
+`ADMIN_SECRET` is unset, the whole router is disabled (fail-closed).
+
+| Method | Path                              | Purpose |
+|--------|-----------------------------------|---------|
+| POST   | `/admin/votes/:id/target`         | Set `target_mint` on an open vote (Treasury Trade / Pulse Wars) |
+| POST   | `/admin/pause`                    | `{ paused: true \| false }` |
+| GET    | `/admin/config`                   | Inspect current `bot_config` |
+
+## Notifications
+
+Telegram is the **sole** broadcast channel. Twitter posting is intentionally
+not implemented — the v2 API requires a paid tier ($100+/mo) and the project
+doesn't want that recurring cost. The Twitter Bearer token is still used in
+read-only mode to verify tweets for the multiplier system.
+
+## Market maker behavior
+
+The MM is implemented as **tiered reactive defense**, not orderbook
+seeding. Memecoin liquidity post-pump.fun-graduation lives in a Raydium
+AMM pool — there's no order book to seed walls against. So the bot:
+
+  - Publishes the desired wall plan (-2 / -5 / -10 % buy, +3 / +7 / +15 %
+    sell) to `mm_state` for dashboard display.
+  - When price drops through each buy-wall level, executes a sized buy
+    from the Defense Vault with a 10-min per-wall cooldown. Each wall
+    deploys at most 10 % of its notional size per tick (≤ 1 SOL cap),
+    so a single dump can't drain the vault.
+  - Sell walls become active once the bot accrues PULSE inventory from
+    earlier defense buybacks — the same pattern fires in reverse.
+
+This is layered above the catastrophic -25 % / 1h defense trigger, which
+remains the primary backstop.
+
 `POST /votes` body:
 ```json
 {

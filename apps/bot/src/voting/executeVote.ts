@@ -8,10 +8,14 @@ import { burnTokens } from "../utils/spl.js";
 import { logger } from "../utils/logger.js";
 import { formatSol } from "../utils/format.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 import type { VoteOption } from "@pulse/shared";
 
-type Handler = (vote: { id: string; decision_pool_sol: number | string }) => Promise<{ txSig: string | null; summary: string }>;
+interface VoteForExec {
+  id: string;
+  decision_pool_sol: number | string;
+  target_mint?: string | null;
+}
+type Handler = (vote: VoteForExec) => Promise<{ txSig: string | null; summary: string }>;
 
 const HANDLERS: Record<string, Handler> = {
   "Buy + Burn": handleBuyBurn,
@@ -36,7 +40,6 @@ export async function executeVote(voteId: string, winningOption: string): Promis
   const tallies = await tallyVoteRecords(voteId);
   await archiveVote(voteId, tallies, txSig);
   await logActivity("VOTE_EXECUTED", summary, { voteId, winningOption, txSig }, txSig);
-  await postTweet(summary);
   await postTelegram(summary);
 }
 
@@ -78,21 +81,16 @@ async function handleBuyBurn(vote: { decision_pool_sol: number | string }) {
   };
 }
 
-async function handleHolderAirdrop(vote: { decision_pool_sol: number | string }) {
-  const { distributeWeeklyRewards } = await import("../actions/rewards.js");
-  // The airdrop reuses the rewards distribution path but draws from Decision Vault.
-  // For deterministic vault accounting we record an activity row here; the actual
-  // transfer step is delegated to the rewards distributor with a one-shot override.
+async function handleHolderAirdrop(vote: VoteForExec) {
+  const { airdropFromDecisionVault } = await import("../actions/rewards.js");
+  const sol = Number(vote.decision_pool_sol);
   if (env.DRY_RUN) {
-    return {
-      txSig: null,
-      summary: `🪂 [DRY-RUN] Holder Airdrop ${formatSol(Number(vote.decision_pool_sol))}`,
-    };
+    return { txSig: null, summary: `🪂 [DRY-RUN] Holder Airdrop ${formatSol(sol)} from Decision Vault` };
   }
-  await distributeWeeklyRewards();
+  const result = await airdropFromDecisionVault(sol);
   return {
-    txSig: null,
-    summary: `🪂 Holder Airdrop executed (${formatSol(Number(vote.decision_pool_sol))} pool)`,
+    txSig: result.signatures.find((s): s is string => !!s) ?? null,
+    summary: `🪂 Holder Airdrop: ${formatSol(result.total_sol)} → ${result.recipients} holders.`,
   };
 }
 
@@ -121,13 +119,12 @@ async function handleReinforceMM(vote: { decision_pool_sol: number | string }) {
   return { txSig: sig, summary: `🛡️ Reinforce MM — ${formatSol(sol)} deposited into Defense Vault` };
 }
 
-async function handleTreasuryTrade(vote: { decision_pool_sol: number | string }) {
-  // Team-specified target mint; default to a no-op summary if missing.
-  const target = (vote as { target_mint?: string }).target_mint;
+async function handleTreasuryTrade(vote: VoteForExec) {
+  const target = vote.target_mint;
   if (!target) {
     return {
       txSig: null,
-      summary: `🎯 Treasury Trade reserved — team must publish target mint before execution.`,
+      summary: `🎯 Treasury Trade reserved — POST /admin/votes/${vote.id}/target to set the mint.`,
     };
   }
   if (env.DRY_RUN) {
@@ -144,11 +141,14 @@ async function handleTreasuryTrade(vote: { decision_pool_sol: number | string })
   return { txSig: sig, summary: `🎯 Treasury Trade executed — ${formatSol(Number(vote.decision_pool_sol))} into ${target.slice(0, 6)}…` };
 }
 
-async function handlePulseWars(vote: { decision_pool_sol: number | string }) {
+async function handlePulseWars(vote: VoteForExec) {
   // Pulse Wars: buy supply of a target competitor memecoin and burn it.
-  const target = (vote as { target_mint?: string }).target_mint;
+  const target = vote.target_mint;
   if (!target) {
-    return { txSig: null, summary: `⚔️ Pulse Wars reserved — target mint not set.` };
+    return {
+      txSig: null,
+      summary: `⚔️ Pulse Wars reserved — POST /admin/votes/${vote.id}/target to set the mint.`,
+    };
   }
   const sol = Number(vote.decision_pool_sol);
   if (env.DRY_RUN) {

@@ -17,7 +17,6 @@ import { logger } from "../utils/logger.js";
 import { computeBpm, pctChange } from "../utils/math.js";
 import { NOTABLE_BUY_SOL } from "../config/constants.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 import { formatSol, formatUsd, shortAddress } from "../utils/format.js";
 
 export interface ParsedTrade {
@@ -81,7 +80,6 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
       t.solAmount * (await solUsd()),
     )} of $PULSE (${formatSol(t.solAmount)}).`;
     await logActivity("NOTABLE_BUY", msg, { ...t });
-    await postTweet(msg);
     await postTelegram(msg);
   }
 }

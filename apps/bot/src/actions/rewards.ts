@@ -22,7 +22,6 @@ import { primaryConnection } from "../integrations/helius.js";
 import { loadKeypair } from "../integrations/wallets.js";
 import { formatSol } from "../utils/format.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 
 export interface RewardComputation {
   wallet: string;
@@ -37,45 +36,92 @@ export async function distributeWeeklyRewards(): Promise<void> {
     logger.info("rewards disabled or paused");
     return;
   }
-  const vault = await getVault("REWARDS");
-  if (!vault) throw new Error("rewards vault missing");
-  const poolSol = Number(vault.balance_sol);
+  await distributeFromVault({
+    vaultKind: "REWARDS",
+    payerKey: "REWARDS",
+    activityKind: "REWARDS_DISTRIBUTION",
+    label: "Weekly rewards",
+    icon: "💸",
+  });
+}
+
+/**
+ * Holder Airdrop voting outcome: redistribute the Decision Vault's pool
+ * proportionally to qualifying holders, weighted by Conviction Score.
+ *
+ * Same compute path as the weekly rewards distributor, but draws from the
+ * Decision Vault (where Treasury Decision funds accumulate) and is signed
+ * by the BOT keypair (which controls the Decision Vault per the spec).
+ */
+export async function airdropFromDecisionVault(poolSol: number): Promise<{
+  recipients: number;
+  total_sol: number;
+  signatures: (string | null)[];
+}> {
+  return distributeFromVault({
+    vaultKind: "DECISION",
+    payerKey: "BOT",
+    activityKind: "AIRDROP",
+    label: "Holder Airdrop",
+    icon: "🪂",
+    poolSolOverride: poolSol,
+  });
+}
+
+interface DistributeArgs {
+  vaultKind: "REWARDS" | "DECISION";
+  payerKey: "REWARDS" | "BOT";
+  activityKind: "REWARDS_DISTRIBUTION" | "AIRDROP";
+  label: string;
+  icon: string;
+  poolSolOverride?: number;
+}
+
+async function distributeFromVault(args: DistributeArgs): Promise<{
+  recipients: number;
+  total_sol: number;
+  signatures: (string | null)[];
+}> {
+  const vault = await getVault(args.vaultKind);
+  if (!vault) throw new Error(`${args.vaultKind} vault missing`);
+  const poolSol = args.poolSolOverride ?? Number(vault.balance_sol);
   if (poolSol <= 0) {
-    logger.info("rewards vault empty; skipping cycle");
-    return;
+    logger.info({ vault: args.vaultKind }, "vault empty; skipping distribution");
+    return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
   const allocations = await computeAllocations(poolSol);
   if (allocations.length === 0) {
-    logger.info("no eligible rewards recipients");
-    return;
+    logger.info({ label: args.label }, "no eligible recipients");
+    return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
   const totalDeploy = allocations.reduce((s, a) => s + a.payoutSol, 0);
   if (!(await tryReserveDailyBudget(totalDeploy))) {
     await logActivity(
       "SAFETY_HALT",
-      `Rewards skipped — daily SOL budget would be exceeded (${formatSol(totalDeploy)}).`,
-      { totalDeploy },
+      `${args.label} skipped — daily SOL budget would be exceeded (${formatSol(totalDeploy)}).`,
+      { totalDeploy, vault: args.vaultKind },
     );
-    return;
+    return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
-  const summary = await sendBatched(allocations);
+  const summary = await sendBatched(allocations, args.payerKey);
   await logActivity(
-    "REWARDS_DISTRIBUTION",
-    `💸 Weekly rewards: ${formatSol(totalDeploy)} → ${allocations.length} wallets across ${summary.batches} batches.`,
+    args.activityKind,
+    `${args.icon} ${args.label}: ${formatSol(totalDeploy)} → ${allocations.length} wallets across ${summary.batches} batches.`,
     {
       total_sol: totalDeploy,
       recipients: allocations.length,
       batches: summary.batches,
       signatures: summary.signatures,
+      vault: args.vaultKind,
     },
   );
 
-  const post = `💸 Weekly $PULSE rewards distributed: ${formatSol(totalDeploy)} → ${allocations.length} holders.`;
-  await postTweet(post);
+  const post = `${args.icon} ${args.label} distributed: ${formatSol(totalDeploy)} → ${allocations.length} holders.`;
   await postTelegram(post);
+  return { recipients: allocations.length, total_sol: totalDeploy, signatures: summary.signatures };
 }
 
 export async function computeAllocations(poolSol: number): Promise<RewardComputation[]> {
@@ -148,14 +194,17 @@ interface BatchSummary {
   signatures: (string | null)[];
 }
 
-async function sendBatched(allocations: RewardComputation[]): Promise<BatchSummary> {
+async function sendBatched(
+  allocations: RewardComputation[],
+  payerKey: "REWARDS" | "BOT" = "REWARDS",
+): Promise<BatchSummary> {
   const signatures: (string | null)[] = [];
   if (env.DRY_RUN) {
-    logger.info({ recipients: allocations.length }, "[DRY-RUN] skipping rewards transfer");
+    logger.info({ recipients: allocations.length, payerKey }, "[DRY-RUN] skipping transfer");
     return { batches: Math.ceil(allocations.length / REWARDS_BATCH_SIZE), signatures };
   }
 
-  const payer = loadKeypair("REWARDS");
+  const payer = loadKeypair(payerKey);
   const conn = primaryConnection();
 
   const batches = chunk(allocations, REWARDS_BATCH_SIZE);

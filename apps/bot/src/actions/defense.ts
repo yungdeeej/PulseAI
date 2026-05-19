@@ -21,7 +21,6 @@ import { buildSwapTx, getQuote, WSOL_MINT } from "../integrations/jupiter.js";
 import { loadKeypair, sendBundledSwap } from "../integrations/wallets.js";
 import { formatSol, pct } from "../utils/format.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 
 let inFlight = false;
 
@@ -117,6 +116,5 @@ async function fireDefense(dropPct: number): Promise<void> {
     reinforcementWindowEndsAt: windowEnds.toISOString(),
   }, txSig);
 
-  await postTweet(summary);
   await postTelegram(summary);
 }

@@ -15,7 +15,6 @@ import { captureSnapshot } from "../features/snapshot.js";
 import { openVote } from "../voting/openVote.js";
 import { logger } from "../utils/logger.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 import { formatUsd } from "../utils/format.js";
 
 const TIER_NAME = ["DISCOVERY", "IGNITION", "MOMENTUM", "CONVICTION", "ASCENSION"] as const;
@@ -98,6 +97,5 @@ export async function executeTierTransition(
   const post = `🚀 *$PULSE Tier ${to}: ${def.name}* @ ${formatUsd(mcap)}\n${snapshotCount} wallets snapshotted${
     vote ? `\nVote open — closes <t:${Math.floor(new Date(vote.closes_at).getTime() / 1000)}:R>` : ""
   }`;
-  await postTweet(post);
   await postTelegram(post);
 }

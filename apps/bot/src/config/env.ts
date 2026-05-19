@@ -50,10 +50,8 @@ const schema = z.object({
 
   BIRDEYE_API_KEY: z.string().optional(),
 
-  TWITTER_API_KEY: z.string().optional(),
-  TWITTER_API_SECRET: z.string().optional(),
-  TWITTER_ACCESS_TOKEN: z.string().optional(),
-  TWITTER_ACCESS_SECRET: z.string().optional(),
+  // Twitter is read-only (free Bearer-token tier) — used by the tweet-
+  // multiplier system to fetch tweet metrics. We do not post tweets.
   TWITTER_BEARER_TOKEN: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHANNEL_ID: z.string().optional(),
@@ -69,6 +67,8 @@ const schema = z.object({
   MAX_DAILY_SOL_DEPLOYED: numeric(50),
   BOT_HOT_WALLET_MAX_BALANCE_SOL: numeric(5),
   HELIUS_WEBHOOK_SECRET: z.string().optional(),
+  // Required to call any /admin/* endpoint. Generate with `openssl rand -hex 32`.
+  ADMIN_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

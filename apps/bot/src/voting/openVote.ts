@@ -11,7 +11,6 @@ import {
 } from "../db/queries.js";
 import { logger } from "../utils/logger.js";
 import { postTelegram } from "../integrations/telegram.js";
-import { postTweet } from "../integrations/twitter.js";
 import { formatSol } from "../utils/format.js";
 
 export async function openVote(tier: Tier) {
@@ -34,7 +33,6 @@ export async function openVote(tier: Tier) {
   )}. Closes <t:${Math.floor(closesAt.getTime() / 1000)}:R>.`;
   await logActivity("VOTE_OPENED", summary, { vote_id: row.id, tier, options, poolSol });
 
-  await postTweet(summary);
   await postTelegram(summary);
 
   return row;
