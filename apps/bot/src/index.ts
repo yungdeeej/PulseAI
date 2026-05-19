@@ -132,14 +132,14 @@ async function main() {
     distributeWeeklyRewards().catch((err) => logger.error({ err }, "rewards failed"));
   });
   // AI consciousness — extract durable memories first, then reflect.
-  // Runs every 15 minutes plus a single warm-up shortly after boot.
+  // Runs every 5 minutes plus a single warm-up shortly after boot.
   const consciousnessTick = async () => {
     try { await extractLifecycleMemories(); }
     catch (err) { logger.warn({ err }, "ai memory extraction failed"); }
     try { await generateInsight(); }
     catch (err) { logger.warn({ err }, "ai insight failed"); }
   };
-  cron.schedule("*/15 * * * *", () => { void consciousnessTick(); });
+  cron.schedule("*/5 * * * *", () => { void consciousnessTick(); });
   setTimeout(() => { void consciousnessTick(); }, 20_000);
 
   registerShutdown();
