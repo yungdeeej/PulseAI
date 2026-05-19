@@ -133,11 +133,30 @@ async function main() {
   });
   // AI consciousness — extract durable memories first, then reflect.
   // Runs every 5 minutes plus a single warm-up shortly after boot.
+  // Overlap guard: if a previous tick is still running (e.g. slow OpenAI
+  // call), skip this tick instead of queuing — prevents wedged ticks from
+  // silently stalling the whole scheduler.
+  let consciousnessRunning = false;
   const consciousnessTick = async () => {
-    try { await extractLifecycleMemories(); }
-    catch (err) { logger.warn({ err }, "ai memory extraction failed"); }
-    try { await generateInsight(); }
-    catch (err) { logger.warn({ err }, "ai insight failed"); }
+    if (consciousnessRunning) {
+      logger.warn("consciousness tick already running — skipping");
+      return;
+    }
+    consciousnessRunning = true;
+    const startedAt = Date.now();
+    try {
+      try { await extractLifecycleMemories(); }
+      catch (err) { logger.warn({ err }, "ai memory extraction failed"); }
+      let insightId: number | null = null;
+      try { insightId = (await generateInsight())?.id ?? null; }
+      catch (err) { logger.warn({ err }, "ai insight failed"); }
+      logger.info(
+        { elapsed_ms: Date.now() - startedAt, insight_id: insightId },
+        "consciousness tick complete",
+      );
+    } finally {
+      consciousnessRunning = false;
+    }
   };
   cron.schedule("*/5 * * * *", () => { void consciousnessTick(); });
   setTimeout(() => { void consciousnessTick(); }, 20_000);

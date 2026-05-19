@@ -356,21 +356,35 @@ export async function generateInsight(): Promise<AIInsight | null> {
     JSON.stringify(ctx, null, 2);
 
   async function callModel(extra?: string): Promise<RawInsight | null> {
+    // Hard timeout so a hung OpenAI socket can never wedge the
+    // consciousness scheduler. AbortController triggers a real cancel on
+    // the underlying request after 60 s.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000);
     try {
-      const completion = await openai.chat.completions.create({
-        model: MODEL,
-        max_completion_tokens: 8192,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: extra ? `${userPrompt}\n\n${extra}` : userPrompt },
-        ],
-      });
+      const completion = await openai.chat.completions.create(
+        {
+          model: MODEL,
+          max_completion_tokens: 8192,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: extra ? `${userPrompt}\n\n${extra}` : userPrompt },
+          ],
+        },
+        { signal: ctrl.signal },
+      );
       const content = completion.choices[0]?.message?.content ?? "{}";
       return JSON.parse(content) as RawInsight;
     } catch (err) {
-      logger.warn({ err: (err as Error).message }, "AI insight generation failed");
+      const aborted = (err as Error).name === "AbortError" || ctrl.signal.aborted;
+      logger.warn(
+        { err: (err as Error).message, aborted },
+        aborted ? "AI insight call timed out (60s)" : "AI insight generation failed",
+      );
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
