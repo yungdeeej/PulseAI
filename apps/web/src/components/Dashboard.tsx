@@ -3,6 +3,7 @@ import BackgroundCanvas from "./BackgroundCanvas";
 import CursorOverlay from "./CursorOverlay";
 import { LeftPanels } from "./StatPanels";
 import RightPanels from "./ActivityFeed";
+import VotingPanel from "./VotingPanel";
 import { useIsMobile } from "../lib/useIsMobile";
 
 export default function Dashboard() {
@@ -38,7 +39,6 @@ export default function Dashboard() {
       {isMobile ? (
         <div style={{
           position: "relative", zIndex: 5,
-          // Push the panel column below the blob hero area
           paddingTop: "62vh",
           paddingBottom: 32,
           paddingLeft: 14,
@@ -48,18 +48,19 @@ export default function Dashboard() {
           gap: 12,
           pointerEvents: "auto",
         }}>
-          {/* Subtle gradient veil so panels read against the bg as the user scrolls */}
           <div style={{
             position: "fixed", left: 0, right: 0, bottom: 0,
             height: "55vh", zIndex: -1, pointerEvents: "none",
             background: "linear-gradient(180deg, rgba(4,5,10,0) 0%, rgba(4,5,10,0.55) 35%, rgba(4,5,10,0.92) 80%)",
           }} />
           <LeftPanels mobile />
+          <VotingPanel mobile />
           <RightPanels mobile />
         </div>
       ) : (
         <>
           <LeftPanels />
+          <VotingPanel />
           <RightPanels />
         </>
       )}

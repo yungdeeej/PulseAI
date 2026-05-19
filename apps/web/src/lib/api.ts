@@ -42,3 +42,61 @@ export async function fetchActivity(limit = 30): Promise<ActivityEvent[]> {
   const data = await res.json();
   return data.activity ?? [];
 }
+
+// ─── Voting ───────────────────────────────────────────────────────────────────
+
+export interface ActiveVote {
+  id: string;
+  tier_id: string;
+  options: string[];
+  decision_pool_sol: number;
+  opens_at: string;
+  closes_at: string;
+  status: "open" | "closed" | "executed";
+  winning_option: string | null;
+  target_mint: string | null;
+}
+
+export interface TallyItem {
+  total_weight: number;
+  count: number;
+}
+
+export type VoteTally = Record<string, TallyItem>;
+
+export interface VoteResponse {
+  vote: ActiveVote | null;
+  tally: VoteTally;
+}
+
+export async function fetchActiveVote(): Promise<VoteResponse> {
+  const res = await fetch(`${BASE}/votes/active`);
+  if (!res.ok) throw new Error(`votes fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchConviction(wallet: string): Promise<number> {
+  const res = await fetch(`${BASE}/wallets/${encodeURIComponent(wallet)}/conviction`);
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return Number(data.weight ?? 0);
+}
+
+export interface SubmitVotePayload {
+  wallet: string;
+  voteId: string;
+  option: string;
+  ts: string;
+  signature: string;
+}
+
+export async function submitVote(
+  payload: SubmitVotePayload,
+): Promise<{ ok: boolean; weight?: number; error?: string }> {
+  const res = await fetch(`${BASE}/votes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
