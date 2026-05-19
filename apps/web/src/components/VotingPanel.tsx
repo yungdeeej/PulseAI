@@ -308,8 +308,13 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
               </div>
 
               {conviction === 0 && !alreadyVoted && (
-                <div style={{ ...infoRowStyle, color: "rgba(140,190,230,0.45)" }}>
-                  NO $PULSE BALANCE DETECTED — ACQUIRE TO VOTE
+                <div style={{ ...infoRowStyle, color: "rgba(140,190,230,0.45)",
+                  whiteSpace: "normal", lineHeight: 1.6, letterSpacing: "0.12em" }}>
+                  NO $PULSE DETECTED
+                  <span style={{ display: "block", fontSize: 9, marginTop: 3,
+                    color: "rgba(140,190,230,0.3)", letterSpacing: "0.10em" }}>
+                    ACQUIRE $PULSE TO EARN VOTING WEIGHT
+                  </span>
                 </div>
               )}
 
