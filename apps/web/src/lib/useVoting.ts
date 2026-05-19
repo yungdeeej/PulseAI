@@ -60,6 +60,7 @@ export interface VotingState {
   submitState: VoteSubmitState;
   submitError: string | null;
   connectWallet: () => Promise<void>;
+  disconnectWallet: () => Promise<void>;
   castVote: (option: string) => Promise<void>;
 }
 
@@ -128,6 +129,17 @@ export function useVoting(): VotingState {
     }
   }, []);
 
+  const disconnectWallet = useCallback(async () => {
+    const sol = getSolana();
+    try { await sol?.disconnect(); } catch { /* ignore */ }
+    setWalletAddress(null);
+    setConviction(null);
+    setMyVote(null);
+    setSubmitState("idle");
+    setSubmitError(null);
+    setWalletState("disconnected");
+  }, []);
+
   const castVote = useCallback(async (option: string) => {
     if (!vote || !walletAddress) return;
     const sol = getSolana();
@@ -166,6 +178,6 @@ export function useVoting(): VotingState {
     vote, tally, loading,
     walletState, walletAddress, conviction,
     myVote, submitState, submitError,
-    connectWallet, castVote,
+    connectWallet, disconnectWallet, castVote,
   };
 }

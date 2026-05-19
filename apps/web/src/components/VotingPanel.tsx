@@ -125,7 +125,7 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
     vote, tally, loading,
     walletState, walletAddress, conviction,
     myVote, submitState, submitError,
-    connectWallet, castVote,
+    connectWallet, disconnectWallet, castVote,
   } = useVoting();
 
   const [selected, setSelected] = useState<string | null>(null);
@@ -280,9 +280,26 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
             <div>
               {/* Wallet info row */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
-                  color: "rgba(140,190,230,0.5)", letterSpacing: "0.12em" }}>
-                  {walletAddress!.slice(0, 6)}…{walletAddress!.slice(-4)}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+                    color: "rgba(140,190,230,0.5)", letterSpacing: "0.12em" }}>
+                    {walletAddress!.slice(0, 6)}…{walletAddress!.slice(-4)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={disconnectWallet}
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: 8,
+                      letterSpacing: "0.14em", color: "rgba(140,190,230,0.35)",
+                      background: "none", border: "1px solid rgba(120,200,255,0.12)",
+                      borderRadius: 3, padding: "1px 6px", cursor: "pointer",
+                      textTransform: "uppercase", transition: "color 0.2s, border-color 0.2s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = "#ff7a8a"; e.currentTarget.style.borderColor = "rgba(255,120,140,0.35)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = "rgba(140,190,230,0.35)"; e.currentTarget.style.borderColor = "rgba(120,200,255,0.12)"; }}
+                  >
+                    DISCONNECT
+                  </button>
                 </div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
                   color: accent, letterSpacing: "0.12em" }}>
@@ -291,7 +308,9 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
               </div>
 
               {conviction === 0 && !alreadyVoted && (
-                <div style={infoRowStyle}>NO $PULSE DETECTED // HOLD TO VOTE</div>
+                <div style={{ ...infoRowStyle, color: "rgba(140,190,230,0.45)" }}>
+                  NO $PULSE BALANCE DETECTED — ACQUIRE TO VOTE
+                </div>
               )}
 
               {alreadyVoted && (
