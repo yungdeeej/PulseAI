@@ -124,6 +124,11 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
     ? priceHistory
     : Array.from({ length: 32 }, (_, i) => 0.00001 + Math.sin(i * 0.4) * 0.000002);
 
+  const mintAddress = tokenState?.mint_address ?? null;
+  const shortMint = mintAddress
+    ? `${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)}`
+    : null;
+
   return (
     <div style={{
       ...(mobile ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
@@ -141,6 +146,16 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
         <div style={{ fontSize: 10.5, color: "rgba(140,190,230,0.55)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
           <LiveDot color="#7aff9f" /> {tierLabel} · CHAMBER A-7
         </div>
+        {shortMint && (
+          <div style={{
+            marginTop: 6, display: "flex", alignItems: "center", gap: 6,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+            letterSpacing: "0.14em", color: "rgba(140,190,230,0.38)",
+          }}>
+            <span style={{ color: "rgba(120,200,255,0.3)" }}>CA</span>
+            <span>{mintAddress}</span>
+          </div>
+        )}
       </div>
 
       <Card label="Market Cap" accent="rgba(150,220,255,0.55)">

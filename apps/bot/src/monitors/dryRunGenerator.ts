@@ -2,16 +2,18 @@ import { env } from "../config/env.js";
 import { insertPrice, patchTokenState } from "../db/queries.js";
 import { evaluateTierTransition } from "../actions/tier.js";
 import { processTradeEvent } from "./tradeIngest.js";
+import { fetchDexScreenerPrice } from "../integrations/dexscreener.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * DRY-RUN synthetic price + trade generator. Produces a deterministic-ish walk
- * across the full tier ladder so pre-launch demos can show every transition.
+ * DRY-RUN synthetic price + trade generator.
  *
- * Time progresses faster when DRY_RUN_TIME_SCALE > 1: e.g. scale=60 means each
- * real second represents 1 simulated minute.
+ * Seeds the starting market cap from DexScreener (real on-chain data) so the
+ * dashboard reflects the actual token price. A real-price refresh runs every
+ * 60 seconds; between refreshes the cursor drifts ±5 % so the sparkline moves.
  */
 let timer: NodeJS.Timeout | null = null;
+let realPriceTimer: NodeJS.Timeout | null = null;
 let cursorMcap = 1_000;
 
 export function startDryRunGenerator(): void {
@@ -20,18 +22,44 @@ export function startDryRunGenerator(): void {
   if (scale <= 0) return;
   const baseIntervalMs = Math.max(250, Math.floor(5_000 / scale));
   logger.info({ baseIntervalMs, scale }, "starting dry-run generator");
+
+  // Seed from DexScreener immediately, then refresh every 60 s
+  seedFromDexScreener();
+  realPriceTimer = setInterval(seedFromDexScreener, 60_000);
+
   timer = setInterval(tick, baseIntervalMs);
 }
 
 export function stopDryRunGenerator(): void {
   if (timer) clearInterval(timer);
+  if (realPriceTimer) clearInterval(realPriceTimer);
   timer = null;
+  realPriceTimer = null;
+}
+
+async function seedFromDexScreener(): Promise<void> {
+  try {
+    const price = await fetchDexScreenerPrice();
+    if (!price || !price.market_cap_usd) return;
+    cursorMcap = price.market_cap_usd;
+    await insertPrice(price.price_usd, price.price_sol, price.market_cap_usd, "dexscreener");
+    await patchTokenState({
+      price_usd: price.price_usd,
+      price_sol: price.price_sol,
+      market_cap_usd: price.market_cap_usd,
+      mint_address: env.PULSE_MINT_ADDRESS,
+    });
+    await evaluateTierTransition(price.market_cap_usd);
+    logger.info({ market_cap_usd: price.market_cap_usd }, "seeded price from dexscreener");
+  } catch (err) {
+    logger.warn({ err }, "dexscreener seed failed");
+  }
 }
 
 async function tick(): Promise<void> {
   try {
-    // Random walk biased upward so we eventually cross every tier.
-    const drift = 1 + (Math.random() - 0.4) * 0.05;
+    // Small random walk around the real price so the sparkline animates
+    const drift = 1 + (Math.random() - 0.48) * 0.015;
     cursorMcap = Math.max(500, cursorMcap * drift);
 
     const supply = Number(env.PULSE_TOTAL_SUPPLY ?? 1_000_000_000);
