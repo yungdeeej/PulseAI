@@ -62,3 +62,8 @@ outputType = "console"
 
 [agent]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+PULSE_MINT_ADDRESS = "JAmSUtdLiXtuJchRnMqF6uvAfrV2kFAWqeLky6Lspump"
