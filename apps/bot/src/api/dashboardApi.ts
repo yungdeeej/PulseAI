@@ -54,7 +54,7 @@ export function mountDashboardApi(app: Express): void {
           market_cap_usd: effectiveMcap,
           holder_count: tokenState?.holder_count ?? null,
           current_tier: tokenState?.current_tier ?? null,
-          volume_24h_usd: tokenState?.volume_24h_usd ?? null,
+          volume_24h_usd: livePrice?.volume_24h_usd ?? tokenState?.volume_24h_usd ?? null,
         },
         vaults,
         priceHistory,

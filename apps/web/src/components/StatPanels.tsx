@@ -107,17 +107,21 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
   const defenseVault = vaults.find((v) => v.kind === "DEFENSE");
   const totalVaultSol = vaults.reduce((sum, v) => sum + Number(v.balance_sol), 0);
 
+  const volume = Number(tokenState?.volume_24h_usd ?? 0);
+
   useEffect(() => {
     const id = setInterval(() => {
-      const base = 64;
-      const variance = (Math.sin(blobLive.breathPhase * 0.5) * 6) + (blobLive.entryPulse * 18);
-      const emoBoost = blobLive.emotion === "excited" ? 38 : blobLive.emotion === "nervous" ? 30
-        : blobLive.emotion === "shocked" ? 44 : blobLive.emotion === "sleepy" ? -20
-        : blobLive.emotion === "sleeping" ? -36 : blobLive.emotion === "focused" ? -8 : 0;
-      setBpm(Math.round(base + variance + emoBoost));
+      // Map 24h volume (USD) logarithmically to BPM range 52–118.
+      // $0 vol → ~52 BPM (resting), $500K+ vol → ~118 BPM (racing).
+      // Small sine flutter (±3) keeps it feeling alive.
+      const targetBpm = volume > 0
+        ? 52 + Math.min(66, 16 * Math.log10(1 + volume / 50))
+        : 52 + Math.min(66, 16 * Math.log10(1 + 0 / 50));
+      const flutter = Math.sin(blobLive.breathPhase * 0.8) * 3;
+      setBpm(Math.round(targetBpm + flutter));
     }, 600);
     return () => clearInterval(id);
-  }, []);
+  }, [volume]);
 
   const accent = `rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`;
   const sparkData = priceHistory.length >= 2

@@ -5,6 +5,7 @@ export interface DexScreenerPrice {
   price_usd: number;
   price_sol: number;
   market_cap_usd: number;
+  volume_24h_usd: number;
   pair_address: string;
 }
 
@@ -27,6 +28,7 @@ export async function fetchDexScreenerPrice(): Promise<DexScreenerPrice | null> 
         priceNative?: string;
         fdv?: number;
         marketCap?: number;
+        volume?: { h24?: number };
       }>;
     };
     const pair = data.pairs?.[0];
@@ -34,8 +36,9 @@ export async function fetchDexScreenerPrice(): Promise<DexScreenerPrice | null> 
     const price_usd = Number(pair.priceUsd ?? 0);
     const price_sol = Number(pair.priceNative ?? 0);
     const market_cap_usd = Number(pair.marketCap ?? pair.fdv ?? 0);
+    const volume_24h_usd = Number(pair.volume?.h24 ?? 0);
     if (!price_usd || !market_cap_usd) return null;
-    return { price_usd, price_sol, market_cap_usd, pair_address: pair.pairAddress ?? "" };
+    return { price_usd, price_sol, market_cap_usd, volume_24h_usd, pair_address: pair.pairAddress ?? "" };
   } catch (err) {
     logger.warn({ err }, "dexscreener fetch error");
     return null;
