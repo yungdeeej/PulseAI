@@ -146,7 +146,7 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
         setOpen={setOpen}
         accent={accent}
         moodLabel="BOOTING"
-        headlinePreview="Neural cortex syncing…"
+        ageLabel="—"
         arrivalPulse={arrivalPulse}
         positionStyle={positionStyle}
       >
@@ -337,7 +337,7 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
       setOpen={setOpen}
       accent={accent}
       moodLabel={latest.mood.toUpperCase()}
-      headlinePreview={latest.headline}
+      ageLabel={timeAgo(latest.created_at).toUpperCase()}
       arrivalPulse={arrivalPulse}
       positionStyle={positionStyle}
     >
@@ -351,23 +351,22 @@ interface DesktopShellProps {
   setOpen: (v: boolean | ((p: boolean) => boolean)) => void;
   accent: string;
   moodLabel: string;
-  headlinePreview: string;
+  ageLabel: string;
   arrivalPulse: boolean;
   positionStyle: React.CSSProperties;
   children: React.ReactNode;
 }
 
 function DesktopShell({
-  open, setOpen, accent, moodLabel, headlinePreview, arrivalPulse, positionStyle, children,
+  open, setOpen, accent, moodLabel, ageLabel, arrivalPulse, positionStyle, children,
 }: DesktopShellProps) {
   const toggleStyle: React.CSSProperties = {
     position: "fixed", left: 24, bottom: 24, zIndex: 6,
     display: "flex", alignItems: "center", gap: 10,
     padding: "10px 14px",
-    minWidth: 240, maxWidth: 340,
     background: "linear-gradient(180deg, rgba(20,28,44,0.78), rgba(8,12,22,0.82))",
     border: `1px solid ${open || arrivalPulse ? `${accent}88` : "rgba(120,200,255,0.22)"}`,
-    borderRadius: 10,
+    borderRadius: 999,
     color: "#cfe6ff", cursor: "pointer", textAlign: "left",
     fontFamily: "'JetBrains Mono', monospace",
     backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
@@ -411,20 +410,12 @@ function DesktopShell({
           background: accent, boxShadow: `0 0 8px ${accent}, 0 0 14px ${accent}`,
           animation: "pulseDot 1.6s ease-in-out infinite", flexShrink: 0,
         }} />
-        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
-          <span style={{
-            fontSize: 9, letterSpacing: "0.22em", color: SUBTLE,
-            textTransform: "uppercase",
-          }}>
-            AI Consciousness · <span style={{ color: accent }}>{moodLabel}</span>
-          </span>
-          <span style={{
-            fontSize: 10.5, color: BODY, letterSpacing: "0.02em",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            {headlinePreview}
-          </span>
+        <span style={{
+          fontSize: 10, letterSpacing: "0.22em", color: SUBTLE,
+          textTransform: "uppercase",
+        }}>
+          AI · <span style={{ color: accent }}>{moodLabel}</span>
+          <span style={{ color: SUBTLE_DIM, marginLeft: 8 }}>{ageLabel}</span>
         </span>
         <span style={{
           fontSize: 11, color: SUBTLE, transform: open ? "rotate(180deg)" : "none",

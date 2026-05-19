@@ -73,28 +73,6 @@ export default function Dashboard() {
 
       <CursorOverlay />
 
-      {/* Bottom center diagnostic bar — desktop only (mobile uses normal flow) */}
-      {!isMobile && (
-        <div style={{
-          position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
-          zIndex: 5, fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10, letterSpacing: "0.3em", color: "rgba(120,180,230,0.45)",
-          display: "flex", alignItems: "center", gap: 14, pointerEvents: "none",
-          whiteSpace: "nowrap",
-        }}>
-          <span style={{
-            display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-            background: "#7aff9f", boxShadow: "0 0 8px #7aff9f",
-            animation: "pulseDot 1.6s ease-in-out infinite",
-          }} />
-          <span>CHAMBER A-7 :: BIOSEAL ENGAGED</span>
-          <span style={{ opacity: 0.4 }}>|</span>
-          <span>UPLINK 442.71 MHz</span>
-          <span style={{ opacity: 0.4 }}>|</span>
-          <span>OBSERVER MODE</span>
-        </div>
-      )}
-
       {/* Global keyframes */}
       <style>{`
         @keyframes pulseDot {
