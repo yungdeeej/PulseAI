@@ -29,6 +29,10 @@ externalPort = 80
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 20643
+externalPort = 3000
+
 [unitTest]
 language = "nodejs"
 
@@ -44,10 +48,6 @@ author = "agent"
 task = "workflow.run"
 args = "Bot (backend)"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
 [[workflows.workflow]]
 name = "Bot (backend)"
 author = "agent"
@@ -59,18 +59,6 @@ waitForPort = 3001
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm install && pnpm --filter @pulse/web dev"
-waitForPort = 5000
 
 [agent]
 expertMode = true
