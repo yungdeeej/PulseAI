@@ -64,9 +64,12 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
   const accent = latest ? EMOTION_COLOR[latest.mood] ?? "rgb(120,200,255)" : "rgb(120,200,255)";
   const firstSeenIso = recent.length > 0 ? recent[recent.length - 1]!.created_at : latest?.created_at;
 
-  const positionStyle: React.CSSProperties = mobile
-    ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
-    : { position: "fixed", top: 24, left: 24 + 260 + 14, width: 320, zIndex: 5 };
+  // Always render inline — parent (RightPanels on desktop, mobile stack on phones)
+  // owns the position. This keeps the blob unobstructed.
+  const positionStyle: React.CSSProperties = {
+    position: "relative", width: "100%",
+    animation: mobile ? "panelIn 0.6s ease-out" : undefined,
+  };
 
   // Card matches the rest of the site (slate-blue, not purple).
   // Accent color appears only on the live dot, the headline rule, the lean badge,

@@ -62,7 +62,8 @@ export default function Dashboard() {
       ) : (
         <>
           <LeftPanels />
-          <ConsciousnessPanel />
+          {/* ConsciousnessPanel is rendered inside RightPanels on desktop so the
+              blob stays unobstructed. */}
           <VotingPanel />
           <RightPanels />
         </>
