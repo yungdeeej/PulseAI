@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { getTokenState, listVaults, pricesInWindow } from "../db/queries.js";
 import { pool } from "../db/pool.js";
 import { logger } from "../utils/logger.js";
+import { env } from "../config/env.js";
 
 export function mountDashboardApi(app: Express): void {
   app.get("/api/healthz", (_req, res) => {
@@ -26,7 +27,9 @@ export function mountDashboardApi(app: Express): void {
           : 0;
 
       res.json({
-        tokenState,
+        tokenState: tokenState
+          ? { ...tokenState, mint_address: tokenState.mint_address ?? env.PULSE_MINT_ADDRESS ?? null }
+          : { mint_address: env.PULSE_MINT_ADDRESS ?? null, price_usd: null, market_cap_usd: null, holder_count: null, current_tier: null, volume_24h_usd: null },
         vaults,
         priceHistory,
         change24h: +change24h.toFixed(2),
