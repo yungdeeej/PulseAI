@@ -2,14 +2,47 @@ import { useEffect, useMemo, useState } from "react";
 import { activityFeed, blobLive, EMOTION_COLOR, pushEvent } from "../lib/blobLive";
 import { useDashboard } from "../lib/useDashboard";
 
+function BuySellBar({ buys, sells }: { buys: number; sells: number }) {
+  const total = buys + sells;
+  if (total === 0) return null;
+  const buyPct = Math.round((buys / total) * 100);
+  const sellPct = 100 - buyPct;
+  const bullish = buyPct > 60;
+  const bearish = sellPct > 60;
+  return (
+    <div style={{ padding: "0 16px 10px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.13em", color: bullish ? "#7aff9f" : "rgba(120,200,140,0.5)" }}>
+          {buys}B · {buyPct}%
+        </span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, letterSpacing: "0.2em", color: "rgba(140,190,230,0.25)" }}>5M FLOW</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.13em", color: bearish ? "#ff7a8a" : "rgba(200,110,100,0.5)" }}>
+          {sellPct}% · {sells}S
+        </span>
+      </div>
+      <div style={{ height: 3, borderRadius: 2, background: "rgba(40,60,100,0.4)", overflow: "hidden", display: "flex" }}>
+        <div style={{
+          width: `${buyPct}%`, height: "100%", transition: "width 1.2s ease",
+          background: bullish ? "linear-gradient(90deg, rgba(80,200,120,0.3), #7aff9f)" : "rgba(100,180,120,0.35)",
+          boxShadow: bullish ? "0 0 6px #7aff9f" : "none",
+        }} />
+        <div style={{
+          width: `${sellPct}%`, height: "100%", transition: "width 1.2s ease",
+          background: bearish ? "linear-gradient(90deg, #ff7a8a, rgba(255,80,60,0.3))" : "rgba(200,90,90,0.3)",
+          boxShadow: bearish ? "0 0 6px #ff7a8a" : "none",
+        }} />
+      </div>
+    </div>
+  );
+}
+
 export default function RightPanels({ mobile = false }: { mobile?: boolean } = {}) {
   const [emotion, setEmotion] = useState(blobLive.emotion);
   const [accent, setAccent] = useState("rgb(80,200,255)");
   const [feedLen, setFeedLen] = useState(activityFeed.length);
   const [reactivity, setReactivity] = useState(blobLive.glowMult);
 
-  // Trigger dashboard polling (which also feeds bot_activity into activityFeed)
-  useDashboard();
+  const { market_activity } = useDashboard();
 
   useEffect(() => {
     let lastEmotion = blobLive.emotion;
@@ -92,6 +125,9 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
 
       <div style={{ ...cardStyle, padding: "14px 0 6px 0" }}>
         <div style={{ ...labelStyle, padding: "0 16px" }}>Live Activity</div>
+        {market_activity && (
+          <BuySellBar buys={market_activity.buys_5m} sells={market_activity.sells_5m} />
+        )}
         <div style={{ maxHeight: 360, overflow: "hidden", padding: "0 16px 6px 16px",
           maskImage: "linear-gradient(180deg, black 80%, transparent)",
           WebkitMaskImage: "linear-gradient(180deg, black 80%, transparent)" }}>

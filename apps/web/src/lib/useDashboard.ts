@@ -81,10 +81,21 @@ const EMOTION_EVENT_COLOR: Record<string, string> = {
   idle:     "rgb(80,200,255)",
 };
 
+function fmtMcap(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
 export function useDashboard(): DashboardState {
   const [state, setState] = useState<DashboardState>(DEFAULT);
   const seenIds = useRef(new Set<number>());
   const lastNarrativeRef = useRef<string | null>(null);
+  const athRef = useRef<number>(
+    typeof window !== "undefined"
+      ? parseFloat(localStorage.getItem("pulse_ath") ?? "0") || 0
+      : 0,
+  );
 
   useEffect(() => {
     let destroyed = false;
@@ -105,6 +116,18 @@ export function useDashboard(): DashboardState {
           if (narrative && narrative !== lastNarrativeRef.current) {
             lastNarrativeRef.current = narrative;
             pushEvent("system", narrative, EMOTION_EVENT_COLOR[newEmotion]);
+          }
+        }
+
+        // ── ATH detection ─────────────────────────────────────────────────────
+        const currentMcap = data.tokenState?.market_cap_usd ?? 0;
+        if (currentMcap > 0 && currentMcap > athRef.current) {
+          const prevAth = athRef.current;
+          athRef.current = currentMcap;
+          try { localStorage.setItem("pulse_ath", String(currentMcap)); } catch {}
+          if (prevAth > 0) {
+            pushEvent("system", `NEW ATH // ${fmtMcap(currentMcap)} // entity transcending`, "rgb(255,210,90)");
+            blobLive.emotion = "excited";
           }
         }
 

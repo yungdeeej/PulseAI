@@ -14,6 +14,19 @@ const TIER_PROGRESS: Record<string, number> = {
   DISCOVERY: 5, IGNITION: 25, MOMENTUM: 50, CONVICTION: 75, ASCENSION: 100,
 };
 
+const NEXT_TIER_THRESHOLD: Record<string, number> = {
+  DISCOVERY: 69_000, IGNITION: 300_000, MOMENTUM: 1_000_000, CONVICTION: 5_000_000,
+};
+const NEXT_TIER_NAME: Record<string, string> = {
+  DISCOVERY: "IGNITION", IGNITION: "MOMENTUM", MOMENTUM: "CONVICTION", CONVICTION: "ASCENSION",
+};
+
+function fmtDistance(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
 function Card({ label, children, accent }: { label: string; children: React.ReactNode; accent?: string }) {
   return (
     <div style={{
@@ -196,6 +209,30 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
         <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: "rgba(60,120,180,0.16)", overflow: "hidden", position: "relative" }}>
           <div style={{ width: `${tierProgress}%`, height: "100%", background: `linear-gradient(90deg, transparent, ${accent})`, boxShadow: `0 0 10px ${accent}` }} />
         </div>
+        {(() => {
+          const nextThreshold = NEXT_TIER_THRESHOLD[tier];
+          const nextName = NEXT_TIER_NAME[tier];
+          if (!nextThreshold || !nextName || cap >= nextThreshold) return null;
+          const toNext = nextThreshold - cap;
+          const nearlyThere = toNext < nextThreshold * 0.08;
+          return (
+            <div style={{ marginTop: 7, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, letterSpacing: "0.12em",
+                color: nearlyThere ? "#7aff9f" : "rgba(140,190,230,0.45)",
+                textShadow: nearlyThere ? "0 0 8px #7aff9f" : "none",
+              }}>
+                {fmtDistance(toNext)} MORE
+              </div>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.16em",
+                color: nearlyThere ? "rgba(120,255,160,0.7)" : "rgba(140,190,230,0.3)",
+              }}>
+                → {nextName}
+              </div>
+            </div>
+          );
+        })()}
       </Card>
 
       <Card label="Treasury">
