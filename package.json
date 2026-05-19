@@ -1,0 +1,21 @@
+{
+  "name": "pulseai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "$PULSE orchestration bot + shared packages",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @pulse/bot dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "migrate": "pnpm --filter @pulse/bot migrate"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
