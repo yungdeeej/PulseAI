@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { activityFeed, blobLive, EMOTION_COLOR, pushEvent } from "../lib/blobLive";
 import { useDashboard } from "../lib/useDashboard";
-import ConsciousnessPanel from "./ConsciousnessPanel";
 
 function BuySellBar({ buys, sells }: { buys: number; sells: number }) {
   const total = buys + sells;
@@ -105,7 +104,6 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
       zIndex: 5, display: "flex", flexDirection: "column", gap: mobile ? 10 : 14,
       fontFamily: "'Inter', sans-serif", color: "#cfe6ff", pointerEvents: "auto",
     }}>
-      {!mobile && <ConsciousnessPanel />}
       <div style={cardStyle}>
         <div style={labelStyle}>Emotional State</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

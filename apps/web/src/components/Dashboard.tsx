@@ -62,10 +62,9 @@ export default function Dashboard() {
       ) : (
         <>
           <LeftPanels />
-          {/* ConsciousnessPanel is rendered inside RightPanels on desktop so the
-              blob stays unobstructed. */}
           <VotingPanel />
           <RightPanels />
+          <ConsciousnessPanel />
         </>
       )}
 

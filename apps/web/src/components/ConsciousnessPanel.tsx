@@ -34,6 +34,8 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
   const [memories, setMemories] = useState<AIMemory[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [arrivalPulse, setArrivalPulse] = useState(false);
+  // Desktop-only: toggle popover open/closed. Mobile always renders inline.
+  const [open, setOpen] = useState(false);
   const lastSeenIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -51,6 +53,8 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
           if (!first) {
             setExpanded(true);
             setArrivalPulse(true);
+            // Surface the new thought automatically on desktop too.
+            setOpen(true);
             setTimeout(() => { if (!dead) setArrivalPulse(false); }, 2400);
           }
         }
@@ -64,12 +68,15 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
   const accent = latest ? EMOTION_COLOR[latest.mood] ?? "rgb(120,200,255)" : "rgb(120,200,255)";
   const firstSeenIso = recent.length > 0 ? recent[recent.length - 1]!.created_at : latest?.created_at;
 
-  // Always render inline — parent (RightPanels on desktop, mobile stack on phones)
-  // owns the position. This keeps the blob unobstructed.
-  const positionStyle: React.CSSProperties = {
-    position: "relative", width: "100%",
-    animation: mobile ? "panelIn 0.6s ease-out" : undefined,
-  };
+  // Mobile renders inline in the stack; desktop renders the panel as a
+  // floating popover anchored above the bottom-left toggle button.
+  const positionStyle: React.CSSProperties = mobile
+    ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
+    : {
+        position: "fixed", left: 24, bottom: 72, width: 340, zIndex: 6,
+        maxHeight: "calc(100vh - 120px)", overflowY: "auto",
+        animation: "panelIn 0.32s ease-out",
+      };
 
   // Card matches the rest of the site (slate-blue, not purple).
   // Accent color appears only on the live dot, the headline rule, the lean badge,
@@ -110,32 +117,46 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
     marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between",
   };
 
-  if (!latest) {
-    return (
-      <div style={{ ...positionStyle, pointerEvents: "auto" }}>
-        <div style={cardStyle}>
-          {corners}
-          <div style={labelStyle}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%",
-                background: "rgba(120,200,255,0.35)", animation: "pulseDot 1.6s ease-in-out infinite" }} />
-              AI Consciousness
-            </span>
-            <span style={{ color: SUBTLE_DIM, letterSpacing: "0.18em" }}>BOOTING</span>
-          </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-            color: SUBTLE_DIM, lineHeight: 1.7, letterSpacing: "0.06em" }}>
-            NEURAL CORTEX SYNCING …<br />
-            FIRST REFLECTION ARRIVES SHORTLY.
-          </div>
-        </div>
+  const bootingPanel = (
+    <div style={cardStyle}>
+      {corners}
+      <div style={labelStyle}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%",
+            background: "rgba(120,200,255,0.35)", animation: "pulseDot 1.6s ease-in-out infinite" }} />
+          AI Consciousness
+        </span>
+        <span style={{ color: SUBTLE_DIM, letterSpacing: "0.18em" }}>BOOTING</span>
       </div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+        color: SUBTLE_DIM, lineHeight: 1.7, letterSpacing: "0.06em" }}>
+        NEURAL CORTEX SYNCING …<br />
+        FIRST REFLECTION ARRIVES SHORTLY.
+      </div>
+    </div>
+  );
+
+  if (!latest) {
+    if (mobile) {
+      return <div style={{ ...positionStyle, pointerEvents: "auto" }}>{bootingPanel}</div>;
+    }
+    return (
+      <DesktopShell
+        open={open}
+        setOpen={setOpen}
+        accent={accent}
+        moodLabel="BOOTING"
+        headlinePreview="Neural cortex syncing…"
+        arrivalPulse={arrivalPulse}
+        positionStyle={positionStyle}
+      >
+        {bootingPanel}
+      </DesktopShell>
     );
   }
 
-  return (
-    <div style={{ ...positionStyle, pointerEvents: "auto" }}>
-      <div style={cardStyle}>
+  const fullPanel = (
+    <div style={cardStyle}>
         {corners}
 
         {/* Header */}
@@ -303,7 +324,115 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
             )}
           </div>
         )}
-      </div>
     </div>
+  );
+
+  if (mobile) {
+    return <div style={{ ...positionStyle, pointerEvents: "auto" }}>{fullPanel}</div>;
+  }
+
+  return (
+    <DesktopShell
+      open={open}
+      setOpen={setOpen}
+      accent={accent}
+      moodLabel={latest.mood.toUpperCase()}
+      headlinePreview={latest.headline}
+      arrivalPulse={arrivalPulse}
+      positionStyle={positionStyle}
+    >
+      {fullPanel}
+    </DesktopShell>
+  );
+}
+
+interface DesktopShellProps {
+  open: boolean;
+  setOpen: (v: boolean | ((p: boolean) => boolean)) => void;
+  accent: string;
+  moodLabel: string;
+  headlinePreview: string;
+  arrivalPulse: boolean;
+  positionStyle: React.CSSProperties;
+  children: React.ReactNode;
+}
+
+function DesktopShell({
+  open, setOpen, accent, moodLabel, headlinePreview, arrivalPulse, positionStyle, children,
+}: DesktopShellProps) {
+  const toggleStyle: React.CSSProperties = {
+    position: "fixed", left: 24, bottom: 24, zIndex: 6,
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "10px 14px",
+    minWidth: 240, maxWidth: 340,
+    background: "linear-gradient(180deg, rgba(20,28,44,0.78), rgba(8,12,22,0.82))",
+    border: `1px solid ${open || arrivalPulse ? `${accent}88` : "rgba(120,200,255,0.22)"}`,
+    borderRadius: 10,
+    color: "#cfe6ff", cursor: "pointer", textAlign: "left",
+    fontFamily: "'JetBrains Mono', monospace",
+    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+    boxShadow: arrivalPulse
+      ? `0 0 0 1px ${accent}33 inset, 0 0 22px -4px ${accent}77, 0 14px 30px -16px ${accent}66`
+      : open
+        ? `0 0 0 1px ${accent}22 inset, 0 14px 30px -18px ${accent}55`
+        : "0 0 0 1px rgba(80,180,255,0.05) inset, 0 14px 30px -20px rgba(0,180,255,0.25)",
+    transition: "border-color 0.25s, box-shadow 0.25s",
+    pointerEvents: "auto",
+  };
+
+  return (
+    <>
+      {open && (
+        <div style={{ ...positionStyle, pointerEvents: "auto" }}>
+          {children}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={toggleStyle}
+        aria-expanded={open}
+        aria-label={open ? "Hide AI consciousness" : "Show AI consciousness"}
+        onMouseEnter={e => {
+          if (!open && !arrivalPulse) {
+            e.currentTarget.style.borderColor = `${accent}66`;
+            e.currentTarget.style.boxShadow = `0 0 0 1px ${accent}22 inset, 0 14px 30px -18px ${accent}55`;
+          }
+        }}
+        onMouseLeave={e => {
+          if (!open && !arrivalPulse) {
+            e.currentTarget.style.borderColor = "rgba(120,200,255,0.22)";
+            e.currentTarget.style.boxShadow = "0 0 0 1px rgba(80,180,255,0.05) inset, 0 14px 30px -20px rgba(0,180,255,0.25)";
+          }
+        }}
+      >
+        <span style={{
+          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+          background: accent, boxShadow: `0 0 8px ${accent}, 0 0 14px ${accent}`,
+          animation: "pulseDot 1.6s ease-in-out infinite", flexShrink: 0,
+        }} />
+        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+          <span style={{
+            fontSize: 9, letterSpacing: "0.22em", color: SUBTLE,
+            textTransform: "uppercase",
+          }}>
+            AI Consciousness · <span style={{ color: accent }}>{moodLabel}</span>
+          </span>
+          <span style={{
+            fontSize: 10.5, color: BODY, letterSpacing: "0.02em",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            {headlinePreview}
+          </span>
+        </span>
+        <span style={{
+          fontSize: 11, color: SUBTLE, transform: open ? "rotate(180deg)" : "none",
+          transition: "transform 0.25s ease", flexShrink: 0,
+        }}>
+          ▴
+        </span>
+      </button>
+    </>
   );
 }
