@@ -66,8 +66,8 @@ export default function FloatingSwap({ mobile = false }: { mobile?: boolean } = 
       <button
         type="button"
         disabled={disabled}
-        onClick={() => { if (!disabled) setOpen(true); }}
-        title={disabled ? "Contract pending" : "Swap SOL → $PULSE"}
+        onClick={() => { if (!disabled) setOpen(o => !o); }}
+        title={disabled ? "Contract pending" : open ? "Close swap" : "Swap SOL → $PULSE"}
         style={buttonStyle}
         onMouseEnter={(e) => { if (!disabled) {
           e.currentTarget.style.transform = mobile ? "" : "translateY(-2px)";
