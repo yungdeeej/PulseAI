@@ -187,6 +187,17 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
           </div>
         </div>
         <div style={{ marginTop: 8 }}><Sparkline data={sparkData} color={accent} /></div>
+        {tokenState?.holder_count != null && Number(tokenState.holder_count) > 0 && (
+          <div style={{
+            marginTop: 7, fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 9, letterSpacing: "0.16em",
+            color: "rgba(140,190,230,0.4)",
+            display: "flex", justifyContent: "space-between",
+          }}>
+            <span>{Number(tokenState.holder_count).toLocaleString()} HOLDERS</span>
+            <span style={{ color: "rgba(140,190,230,0.22)" }}>ON-CHAIN</span>
+          </div>
+        )}
       </Card>
 
       <Card label="Heart Rate">

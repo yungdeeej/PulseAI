@@ -111,3 +111,15 @@ export async function submitVote(
   });
   return res.json();
 }
+
+export async function submitTweetUrl(
+  wallet: string,
+  url: string,
+): Promise<{ ok: boolean; id?: string; reason?: string }> {
+  const res = await fetch(`${BASE}/tweets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet, url }),
+  });
+  return res.json();
+}

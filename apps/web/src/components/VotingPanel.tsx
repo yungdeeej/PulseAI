@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useVoting } from "../lib/useVoting";
 import { blobLive } from "../lib/blobLive";
+import { submitTweetUrl } from "../lib/api";
 
 const OPTION_LABELS: Record<string, string> = {
   "Buy + Burn":         "BUY + BURN",
@@ -130,6 +131,24 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("–");
+  const [boostOpen, setBoostOpen] = useState(false);
+  const [tweetUrl, setTweetUrl] = useState("");
+  const [tweetState, setTweetState] = useState<"idle" | "submitting" | "pending" | "error">("idle");
+  const [tweetError, setTweetError] = useState<string | null>(null);
+
+  async function handleTweetSubmit() {
+    if (!walletAddress || !tweetUrl.trim()) return;
+    setTweetState("submitting");
+    setTweetError(null);
+    const result = await submitTweetUrl(walletAddress, tweetUrl.trim());
+    if (result.ok) {
+      setTweetState("pending");
+      setTweetUrl("");
+    } else {
+      setTweetState("error");
+      setTweetError(result.reason ?? "submission failed");
+    }
+  }
 
   useEffect(() => {
     if (!vote) return;
@@ -306,6 +325,130 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
                   {conviction !== null ? `CONVICTION ${conviction.toFixed(2)}` : "LOADING…"}
                 </div>
               </div>
+
+              {conviction !== null && conviction > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => { setBoostOpen(b => !b); setTweetState("idle"); setTweetError(null); }}
+                    style={{
+                      width: "100%", padding: "8px 12px",
+                      background: boostOpen ? "rgba(120,200,255,0.06)" : "rgba(20,30,50,0.3)",
+                      border: `1px solid ${boostOpen ? "rgba(120,200,255,0.25)" : "rgba(120,200,255,0.10)"}`,
+                      borderRadius: 8, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, color: "#78c8ff" }}>⚡</span>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5,
+                        letterSpacing: "0.18em", color: boostOpen ? "#78c8ff" : "rgba(140,190,230,0.55)",
+                        textTransform: "uppercase",
+                      }}>
+                        BOOST CONVICTION
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace", fontSize: 8,
+                        letterSpacing: "0.12em", color: "rgba(120,200,255,0.45)",
+                        border: "1px solid rgba(120,200,255,0.18)", borderRadius: 3, padding: "1px 6px",
+                      }}>+0.25×</span>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+                        color: "rgba(140,190,230,0.35)", transition: "transform 0.2s",
+                        display: "inline-block", transform: boostOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      }}>▾</span>
+                    </div>
+                  </button>
+
+                  {boostOpen && (
+                    <div style={{
+                      marginTop: 6, padding: "12px", borderRadius: 8,
+                      background: "rgba(10,18,34,0.6)",
+                      border: "1px solid rgba(120,200,255,0.12)",
+                    }}>
+                      <div style={{
+                        fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5,
+                        letterSpacing: "0.13em", color: "rgba(140,190,230,0.45)",
+                        marginBottom: 10, lineHeight: 1.6,
+                      }}>
+                        TWEET ABOUT $PULSE → EARN A +0.25× CONVICTION MULTIPLIER FOR 7 DAYS.
+                        TWEET MUST MENTION $PULSE AND REACH 100 LIKES TO ACTIVATE.
+                      </div>
+
+                      {tweetState === "pending" ? (
+                        <div style={{
+                          padding: "10px 12px", borderRadius: 8,
+                          background: "rgba(120,200,255,0.05)",
+                          border: "1px solid rgba(120,200,255,0.22)",
+                          fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5,
+                          letterSpacing: "0.14em", color: "#78c8ff",
+                          textAlign: "center",
+                        }}>
+                          ◎ TWEET SUBMITTED — PENDING 100 LIKES
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input
+                            type="url"
+                            placeholder="https://x.com/..."
+                            value={tweetUrl}
+                            onChange={e => setTweetUrl(e.target.value)}
+                            disabled={tweetState === "submitting"}
+                            style={{
+                              flex: 1, padding: "8px 10px",
+                              background: "rgba(10,18,34,0.8)",
+                              border: "1px solid rgba(120,200,255,0.18)",
+                              borderRadius: 6, outline: "none",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: 9.5, letterSpacing: "0.08em",
+                              color: "rgba(200,225,255,0.85)",
+                              minWidth: 0,
+                            }}
+                            onKeyDown={e => { if (e.key === "Enter") handleTweetSubmit(); }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleTweetSubmit}
+                            disabled={!tweetUrl.trim() || tweetState === "submitting"}
+                            style={{
+                              padding: "8px 12px", borderRadius: 6, flexShrink: 0,
+                              background: (!tweetUrl.trim() || tweetState === "submitting")
+                                ? "rgba(20,30,50,0.5)"
+                                : "rgba(120,200,255,0.12)",
+                              border: `1px solid ${(!tweetUrl.trim() || tweetState === "submitting")
+                                ? "rgba(120,200,255,0.10)"
+                                : "rgba(120,200,255,0.35)"}`,
+                              color: (!tweetUrl.trim() || tweetState === "submitting")
+                                ? "rgba(140,190,230,0.25)"
+                                : "#78c8ff",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase",
+                              cursor: (!tweetUrl.trim() || tweetState === "submitting") ? "default" : "pointer",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            {tweetState === "submitting" ? "…" : "SUBMIT"}
+                          </button>
+                        </div>
+                      )}
+
+                      {tweetState === "error" && (
+                        <div style={{
+                          marginTop: 6, fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 8.5, letterSpacing: "0.12em",
+                          color: "#ff7a8a", textTransform: "uppercase",
+                        }}>
+                          ✕ {tweetError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {conviction === 0 && !alreadyVoted && (
                 <div style={{
