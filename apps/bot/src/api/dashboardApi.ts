@@ -4,6 +4,7 @@ import { pool } from "../db/pool.js";
 import { logger } from "../utils/logger.js";
 import { env } from "../config/env.js";
 import { fetchDexScreenerPrice, fetchDexScreenerHistory } from "../integrations/dexscreener.js";
+import { fetchWalletSolBalance } from "../integrations/solanaRpc.js";
 
 export function mountDashboardApi(app: Express): void {
   app.get("/api/healthz", (_req, res) => {
@@ -14,10 +15,13 @@ export function mountDashboardApi(app: Express): void {
     try {
       const supply = Number(env.PULSE_TOTAL_SUPPLY ?? 1_000_000_000);
 
-      const [tokenState, vaults, livePrice] = await Promise.all([
+      const creatorWallet = env.CREATOR_WALLET_ADDRESS ?? null;
+
+      const [tokenState, vaults, livePrice, creatorWalletSol] = await Promise.all([
         getTokenState(),
         listVaults(),
         fetchDexScreenerPrice(),
+        creatorWallet ? fetchWalletSolBalance(creatorWallet) : Promise.resolve(null),
       ]);
 
       // Fetch real OHLCV bar history using the pair address from DexScreener
@@ -59,6 +63,7 @@ export function mountDashboardApi(app: Express): void {
         vaults,
         priceHistory,
         change24h: +change24h.toFixed(2),
+        creator_wallet_sol: creatorWalletSol,
       });
     } catch (err) {
       logger.warn({ err }, "dashboard api error");

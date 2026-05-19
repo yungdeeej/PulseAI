@@ -25,6 +25,7 @@ const schema = z.object({
   QUICKNODE_RPC_URL: z.string().url().optional(),
 
   PULSE_MINT_ADDRESS: z.string().optional(),
+  CREATOR_WALLET_ADDRESS: z.string().optional(),
   PULSE_TOTAL_SUPPLY: numeric(1_000_000_000),
   PULSE_DECIMALS: numeric(6),
 

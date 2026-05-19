@@ -95,7 +95,7 @@ function Waveform() {
 }
 
 export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
-  const { tokenState, vaults, priceHistory, change24h } = useDashboard();
+  const { tokenState, vaults, priceHistory, change24h, creator_wallet_sol } = useDashboard();
   const [bpm, setBpm] = useState(72);
 
   const cap = Number(tokenState?.market_cap_usd ?? 0);
@@ -202,15 +202,26 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
-              {totalVaultSol > 0 ? `${totalVaultSol.toFixed(3)} SOL` : "VAULT SECURED"}
+              {creator_wallet_sol !== null && creator_wallet_sol !== undefined
+                ? `${creator_wallet_sol.toFixed(4)} SOL`
+                : totalVaultSol > 0 ? `${totalVaultSol.toFixed(3)} SOL` : "VAULT SECURED"}
             </div>
             <div style={{ fontSize: 10, color: "rgba(140,190,230,0.55)", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-              {decisionVault
-                ? `DEC ${Number(decisionVault.balance_sol).toFixed(3)} · DEF ${Number(defenseVault?.balance_sol ?? 0).toFixed(3)}`
-                : "5 vaults · online"}
+              {creator_wallet_sol !== null && creator_wallet_sol !== undefined
+                ? `CREATOR REWARDS · LIVE`
+                : decisionVault
+                  ? `DEC ${Number(decisionVault.balance_sol).toFixed(3)} · DEF ${Number(defenseVault?.balance_sol ?? 0).toFixed(3)}`
+                  : "5 vaults · online"}
             </div>
           </div>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(120,255,160,0.10)", border: "1px solid rgba(120,255,160,0.4)", display: "grid", placeItems: "center", color: "#7aff9f", fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}>◉</div>
+          <div style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: creator_wallet_sol !== null && creator_wallet_sol !== undefined
+              ? "rgba(120,255,160,0.15)" : "rgba(120,255,160,0.10)",
+            border: `1px solid ${creator_wallet_sol !== null && creator_wallet_sol !== undefined ? "rgba(120,255,160,0.6)" : "rgba(120,255,160,0.4)"}`,
+            display: "grid", placeItems: "center", color: "#7aff9f",
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
+          }}>◉</div>
         </div>
       </Card>
 

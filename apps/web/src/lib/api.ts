@@ -9,13 +9,6 @@ export interface TokenState {
   mint_address: string | null;
 }
 
-export interface DashboardData {
-  tokenState: TokenState | null;
-  vaults: Vault[];
-  priceHistory: number[];
-  change24h: number;
-}
-
 export interface Vault {
   kind: string;
   balance_sol: number;
@@ -28,6 +21,7 @@ export interface DashboardData {
   vaults: Vault[];
   priceHistory: number[];
   change24h: number;
+  creator_wallet_sol: number | null;
 }
 
 export interface ActivityEvent {
