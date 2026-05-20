@@ -51,10 +51,9 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
           const first = lastSeenIdRef.current === null;
           lastSeenIdRef.current = data.latest.id;
           if (!first) {
-            setExpanded(true);
+            // Pulse the pill to signal a new thought, but do NOT auto-open
+            // the panel — it would cover the stat panels underneath.
             setArrivalPulse(true);
-            // Surface the new thought automatically on desktop too.
-            setOpen(true);
             setTimeout(() => { if (!dead) setArrivalPulse(false); }, 2400);
           }
         }
