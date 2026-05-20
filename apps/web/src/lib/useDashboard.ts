@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchDashboard, fetchActivity, type DashboardData, type ActivityEvent, type MarketActivity } from "./api";
-import { pushEvent, activityFeed, blobLive } from "./blobLive";
+import { pushEvent, activityFeed, blobLive, tierIndex } from "./blobLive";
 
 const DASHBOARD_POLL_MS = 15_000;
 const ACTIVITY_POLL_MS = 10_000;
@@ -100,15 +100,22 @@ function fmtMcap(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
+// Module-scope guards. `useDashboard` is consumed by multiple components
+// (stats, activity, voting, swap), so each instance polls the API on its
+// own timer. Without a shared guard, every consumer would emit duplicate
+// promotion/ATH events. These module-level values ensure each milestone
+// fires exactly once globally per browser session.
+let lastSeenTier: string | null =
+  typeof window !== "undefined" ? localStorage.getItem("pulse_tier") : null;
+let lastSeenAth: number =
+  typeof window !== "undefined"
+    ? parseFloat(localStorage.getItem("pulse_ath") ?? "0") || 0
+    : 0;
+let lastNarrativeText: string | null = null;
+
 export function useDashboard(): DashboardState {
   const [state, setState] = useState<DashboardState>(DEFAULT);
   const seenIds = useRef(new Set<number>());
-  const lastNarrativeRef = useRef<string | null>(null);
-  const athRef = useRef<number>(
-    typeof window !== "undefined"
-      ? parseFloat(localStorage.getItem("pulse_ath") ?? "0") || 0
-      : 0,
-  );
 
   useEffect(() => {
     let destroyed = false;
@@ -132,17 +139,41 @@ export function useDashboard(): DashboardState {
           // Push a trade narrative event when something interesting happens
           // (only if the narrative text has changed to avoid repetitive spam)
           const narrative = narrativeEvent(data.market_activity);
-          if (narrative && narrative !== lastNarrativeRef.current) {
-            lastNarrativeRef.current = narrative;
+          if (narrative && narrative !== lastNarrativeText) {
+            lastNarrativeText = narrative;
             pushEvent("system", narrative, EMOTION_EVENT_COLOR[newEmotion]);
           }
         }
 
+        // ── Tier propagation + promotion detection ────────────────────────────
+        const currentTier = data.tokenState?.current_tier ?? "DISCOVERY";
+        blobLive.tier = currentTier;
+        const prevTier = lastSeenTier;
+        if (prevTier && prevTier !== currentTier &&
+            tierIndex(currentTier) > tierIndex(prevTier)) {
+          // Promotion! Fire celebration (module-scope guard makes this
+          // emit exactly once even if multiple useDashboard consumers see
+          // the same poll result).
+          lastSeenTier = currentTier;
+          try { localStorage.setItem("pulse_tier", currentTier); } catch {}
+          blobLive.tierPromotedAt = Date.now();
+          blobLive.emotion = "excited";
+          pushEvent(
+            "system",
+            `TIER ASCENSION // ${prevTier} → ${currentTier} // entity evolving`,
+            "rgb(255,210,90)",
+          );
+        } else if (prevTier !== currentTier) {
+          // Silent sync (first load, or downgrade — no celebration).
+          lastSeenTier = currentTier;
+          try { localStorage.setItem("pulse_tier", currentTier); } catch {}
+        }
+
         // ── ATH detection ─────────────────────────────────────────────────────
         const currentMcap = data.tokenState?.market_cap_usd ?? 0;
-        if (currentMcap > 0 && currentMcap > athRef.current) {
-          const prevAth = athRef.current;
-          athRef.current = currentMcap;
+        if (currentMcap > 0 && currentMcap > lastSeenAth) {
+          const prevAth = lastSeenAth;
+          lastSeenAth = currentMcap;
           try { localStorage.setItem("pulse_ath", String(currentMcap)); } catch {}
           if (prevAth > 0) {
             pushEvent("system", `NEW ATH // ${fmtMcap(currentMcap)} // entity transcending`, "rgb(255,210,90)");

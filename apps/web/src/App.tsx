@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { blobLive } from "./lib/blobLive";
+import { blobLive, tierIndex } from "./lib/blobLive";
 
 // ─── Emotion system ───────────────────────────────────────────────────────────
 
@@ -682,6 +682,52 @@ export default function App(){
       ctx.fillStyle = conGrad;
       ctx.beginPath(); ctx.ellipse(vcx, shadowY + BR * 0.04, conR, conH, 0, 0, Math.PI*2); ctx.fill();
       ctx.restore();
+
+      // ── Tier aura (concentric halos that scale with current tier) ────────
+      // DISCOVERY (0): no extra rings. Each tier above adds one halo further
+      // out, with a slow pulse so the aura feels alive. ASCENSION (4) gets
+      // four stacked rings — visibly the most "evolved" form.
+      const tIdx = tierIndex(blobLive.tier);
+      const promoElapsed = blobLive.tierPromotedAt > 0
+        ? (Date.now() - blobLive.tierPromotedAt) / 1000 : 99;
+      const promoBoost = promoElapsed < 6
+        ? Math.max(0, 1 - promoElapsed / 6) * 1.6 : 0;
+      if (tIdx > 0 || promoBoost > 0) {
+        const ringCount = Math.max(tIdx, promoBoost > 0 ? tIdx + 1 : 0);
+        for (let i = 0; i < ringCount; i++) {
+          const phase = (time * 0.55 + i * 0.85) % (Math.PI * 2);
+          const pulse = 0.5 + 0.5 * Math.sin(phase);
+          const ringR = BR * (1.18 + 0.22 * i + 0.06 * pulse) * breathSquash * emoExpand;
+          const baseAlpha = (0.14 + 0.06 * pulse) * finalGlow * (1 - i * 0.14);
+          const alpha = Math.min(1, baseAlpha + promoBoost * 0.35);
+          const ringG = ctx.createRadialGradient(vcx, vcy, ringR * 0.82, vcx, vcy, ringR);
+          ringG.addColorStop(0,   `rgba(${bs.bodyR|0},${bs.bodyG|0},${bs.bodyB|0},0)`);
+          ringG.addColorStop(0.7, `rgba(${bs.bodyR|0},${bs.bodyG|0},${bs.bodyB|0},${alpha})`);
+          ringG.addColorStop(1,   `rgba(${bs.bodyR|0},${bs.bodyG|0},${bs.bodyB|0},0)`);
+          ctx.fillStyle = ringG;
+          ctx.beginPath();
+          ctx.arc(vcx, vcy, ringR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // ASCENSION (tier 4): add a thin rotating accent arc for "evolved" feel.
+        if (tIdx >= 4) {
+          ctx.save();
+          ctx.translate(vcx, vcy);
+          ctx.rotate(time * 0.6);
+          const arcR = BR * (1.85 + 0.04 * Math.sin(time * 1.2));
+          ctx.strokeStyle = `rgba(${bs.bodyR|0},${bs.bodyG|0},${bs.bodyB|0},${0.32 * finalGlow})`;
+          ctx.lineWidth = 1.2;
+          ctx.shadowColor = `rgba(${bs.bodyR|0},${bs.bodyG|0},${bs.bodyB|0},0.9)`;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(0, 0, arcR, 0, Math.PI * 0.75);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(0, 0, arcR, Math.PI, Math.PI * 1.75);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
 
       if(pulling&&pullRadius>3){
         const pullPts=getPullPoints(pullX,pullY,pullRadius,time);

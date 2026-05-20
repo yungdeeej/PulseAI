@@ -8,6 +8,7 @@ import VotingPanel from "./VotingPanel";
 import ConsciousnessPanel from "./ConsciousnessPanel";
 import FloatingSwap from "./FloatingSwap";
 import MobileCollapse from "./MobileCollapse";
+import TierPromotionOverlay from "./TierPromotionOverlay";
 import { useIsMobile } from "../lib/useIsMobile";
 
 type MobileSection = "stats" | "consciousness" | "voting" | "activity" | null;
@@ -115,6 +116,7 @@ export default function Dashboard() {
       )}
 
       <CursorOverlay />
+      <TierPromotionOverlay />
 
       {/* Global keyframes */}
       <style>{`

@@ -13,6 +13,11 @@ export interface BlobLive {
   blobX: number; blobY: number; blobR: number;
   cursorX: number; cursorY: number;
   cursorVel: number;
+  // Tier evolution. tier is the current tier key (DISCOVERY..ASCENSION).
+  // tierPromotedAt is a Date.now() timestamp that flips when the tier
+  // increases; UI overlays listen for changes to animate a celebration.
+  tier: string;
+  tierPromotedAt: number;
 }
 
 export const blobLive: BlobLive = {
@@ -26,7 +31,21 @@ export const blobLive: BlobLive = {
   blobX: 0, blobY: 0, blobR: 100,
   cursorX: -1, cursorY: -1,
   cursorVel: 0,
+  tier: "DISCOVERY",
+  tierPromotedAt: 0,
 };
+
+export const TIER_INDEX: Record<string, number> = {
+  DISCOVERY: 0,
+  IGNITION:  1,
+  MOMENTUM:  2,
+  CONVICTION: 3,
+  ASCENSION: 4,
+};
+
+export function tierIndex(tier: string): number {
+  return TIER_INDEX[tier] ?? 0;
+}
 
 export interface ActivityEvent {
   id: number;
