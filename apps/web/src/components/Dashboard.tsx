@@ -1,3 +1,4 @@
+import { useState } from "react";
 import App from "../App";
 import BackgroundCanvas from "./BackgroundCanvas";
 import CursorOverlay from "./CursorOverlay";
@@ -6,10 +7,16 @@ import RightPanels from "./ActivityFeed";
 import VotingPanel from "./VotingPanel";
 import ConsciousnessPanel from "./ConsciousnessPanel";
 import FloatingSwap from "./FloatingSwap";
+import MobileCollapse from "./MobileCollapse";
 import { useIsMobile } from "../lib/useIsMobile";
+
+type MobileSection = "stats" | "consciousness" | "voting" | "activity" | null;
 
 export default function Dashboard() {
   const isMobile = useIsMobile();
+  const [openSection, setOpenSection] = useState<MobileSection>("stats");
+  const toggle = (s: Exclude<MobileSection, null>) =>
+    setOpenSection((curr) => (curr === s ? null : s));
 
   return (
     <div style={{
@@ -47,7 +54,7 @@ export default function Dashboard() {
           paddingRight: 14,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: 10,
           pointerEvents: "auto",
         }}>
           <div style={{
@@ -55,11 +62,47 @@ export default function Dashboard() {
             height: "55vh", zIndex: -1, pointerEvents: "none",
             background: "linear-gradient(180deg, rgba(4,5,10,0) 0%, rgba(4,5,10,0.55) 35%, rgba(4,5,10,0.92) 80%)",
           }} />
-          <LeftPanels mobile />
+          <MobileCollapse
+            title="Stats"
+            subtitle="Market · Tier · Treasury"
+            accent="rgba(150,220,255,0.55)"
+            open={openSection === "stats"}
+            onToggle={() => toggle("stats")}
+          >
+            <LeftPanels mobile />
+          </MobileCollapse>
+
+          <MobileCollapse
+            title="Consciousness"
+            subtitle="AI insight stream"
+            accent="rgba(180,160,255,0.55)"
+            open={openSection === "consciousness"}
+            onToggle={() => toggle("consciousness")}
+          >
+            <ConsciousnessPanel mobile />
+          </MobileCollapse>
+
+          <MobileCollapse
+            title="Voting"
+            subtitle="Community decisions"
+            accent="rgba(120,255,160,0.55)"
+            open={openSection === "voting"}
+            onToggle={() => toggle("voting")}
+          >
+            <VotingPanel mobile />
+          </MobileCollapse>
+
+          <MobileCollapse
+            title="Live Activity"
+            subtitle="Emotion · Feed · System"
+            accent="rgba(255,180,120,0.55)"
+            open={openSection === "activity"}
+            onToggle={() => toggle("activity")}
+          >
+            <RightPanels mobile />
+          </MobileCollapse>
+
           <FloatingSwap mobile />
-          <ConsciousnessPanel mobile />
-          <VotingPanel mobile />
-          <RightPanels mobile />
         </div>
       ) : (
         <>
