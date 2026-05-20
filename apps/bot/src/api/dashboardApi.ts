@@ -50,7 +50,11 @@ export function mountDashboardApi(app: Express): void {
       const change24h =
         first && last && first > 0 ? ((last - first) / first) * 100 : 0;
 
-      const mintAddress = tokenState?.mint_address ?? env.PULSE_MINT_ADDRESS ?? null;
+      // DB is the single source of truth for the live mint. The env var is
+      // a bootstrap hint for the bot's market-data pollers only — it must
+      // not leak into the API response, otherwise a stale launch CA would
+      // appear in the UI before the new token is live.
+      const mintAddress = tokenState?.mint_address ?? null;
 
       res.json({
         tokenState: {
