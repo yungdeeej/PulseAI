@@ -69,3 +69,7 @@ integrations = ["javascript_openai_ai_integrations:2.0.0"]
 [userenv.shared]
 PULSE_MINT_ADDRESS = "JAmSUtdLiXtuJchRnMqF6uvAfrV2kFAWqeLky6Lspump"
 CREATOR_WALLET_ADDRESS = "5tBAzbdnRdKVqn9Ed6y8N4Xwh8iXyQbaXwnTEKE8xfkJ"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
