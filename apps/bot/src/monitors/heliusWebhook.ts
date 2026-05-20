@@ -1,11 +1,17 @@
 import express, { type Request, type Response } from "express";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import { processTradeEvent, type ParsedTrade } from "./tradeIngest.js";
 import { mountPublicApi } from "../api/publicApi.js";
 import { mountAdminApi } from "../api/adminApi.js";
 import { mountDashboardApi } from "../api/dashboardApi.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function createWebhookApp() {
   const app = express();
@@ -17,6 +23,20 @@ export function createWebhookApp() {
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
     if (_req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+
+  // Short-TTL caching on GET dashboard reads so a thundering herd of
+  // pollers (1000 users * 15s polls = ~67 req/s) gets absorbed by
+  // Replit's edge cache instead of slamming Postgres every time.
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
+    const p = req.path;
+    if (p === "/api/dashboard" || p === "/api/activity") {
+      res.setHeader("Cache-Control", "public, max-age=5, s-maxage=5, stale-while-revalidate=15");
+    } else if (p === "/api/consciousness" || p === "/api/votes") {
+      res.setHeader("Cache-Control", "public, max-age=10, s-maxage=10, stale-while-revalidate=30");
+    }
     next();
   });
 
@@ -59,6 +79,41 @@ export function createWebhookApp() {
       );
     }
   });
+
+  // Serve the built React frontend in production so we only need a single
+  // public port. The frontend is built into apps/web/dist/public during
+  // deployment (see .replit [deployment] build step). In dev the Vite
+  // server on port 5000 still handles the frontend separately.
+  const webDist = path.resolve(__dirname, "../../../web/dist/public");
+  if (fs.existsSync(webDist)) {
+    // Hashed Vite assets are immutable — long max-age. index.html stays
+    // short-lived so deploys take effect immediately.
+    app.use(express.static(webDist, {
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60");
+        }
+      },
+    }));
+    // SPA fallback — any non-API GET that didn't match above serves index.html.
+    app.get("*", (req, res, next) => {
+      if (
+        req.method !== "GET" ||
+        req.path.startsWith("/api") ||
+        req.path.startsWith("/healthz") ||
+        req.path.startsWith("/helius") ||
+        req.path.startsWith("/votes") ||
+        req.path.startsWith("/wallets") ||
+        req.path.startsWith("/admin")
+      ) return next();
+      res.sendFile(path.join(webDist, "index.html"));
+    });
+    logger.info({ webDist }, "serving frontend from built assets");
+  } else {
+    logger.info("no built frontend found — running API-only (Vite dev server handles UI)");
+  }
 
   return app;
 }

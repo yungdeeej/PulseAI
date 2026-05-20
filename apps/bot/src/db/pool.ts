@@ -23,11 +23,16 @@ const isLocal = /(@localhost|@127\.0\.0\.1|@\[?::1\]?)/.test(url);
 const sslDisabledByQuery = /sslmode=disable/.test(url);
 const ssl = isLocal || sslDisabledByQuery ? undefined : { rejectUnauthorized: false };
 
+// Pool sized for ~1000 concurrent dashboard viewers polling every 10-30s.
+// At ~100 req/s with ~50ms p99 query time we need ~5 simultaneous queries —
+// 50 gives us 10× headroom for spikes. Replit Hosted Postgres allows >100
+// connections so this is well within limits.
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
   ssl,
-  max: 10,
+  max: 50,
   idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 pool.on("error", (err) => {

@@ -14,8 +14,8 @@ AUTO_MIGRATE = "true"
 
 [deployment]
 deploymentTarget = "vm"
-build = ["bash", "-c", "corepack enable && pnpm install --frozen-lockfile"]
-run  = ["bash", "-c", "AUTO_MIGRATE=true pnpm --filter @pulse/bot start"]
+build = ["bash", "-c", "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/blob-character build"]
+run = ["bash", "-c", "AUTO_MIGRATE=true pnpm --filter @pulse/bot start"]
 
 [deployment.env]
 NODE_ENV = "production"
