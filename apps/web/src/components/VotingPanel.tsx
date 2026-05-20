@@ -4,25 +4,13 @@ import { blobLive } from "../lib/blobLive";
 import { submitTweetUrl, fetchConsciousness, type AIInsight } from "../lib/api";
 
 const OPTION_LABELS: Record<string, string> = {
-  "Buy + Burn":         "BUY + BURN",
-  "Hold & Compound":    "HOLD & COMPOUND",
-  "Reinforce MM":       "REINFORCE MM",
-  "Hold":               "HOLD",
-  "Holder Airdrop":     "HOLDER AIRDROP",
-  "Treasury Trade":     "TREASURY TRADE",
-  "Pulse Wars":         "PULSE WARS",
-  "Permanent Strategy": "PERMANENT STRATEGY",
+  "Defend Chart":  "DEFEND CHART",
+  "Split Rewards": "SPLIT REWARDS",
 };
 
 const OPTION_DESC: Record<string, string> = {
-  "Buy + Burn":         "Swap decision SOL for $PULSE via Jupiter and burn",
-  "Hold & Compound":    "Retain treasury; compound toward next tier",
-  "Reinforce MM":       "Move SOL from Decision → Defense vault",
-  "Hold":               "Hold current position, await conditions",
-  "Holder Airdrop":     "Distribute SOL proportionally to holders",
-  "Treasury Trade":     "Swap SOL for admin-configured target mint",
-  "Pulse Wars":         "Buy a rival token and burn it",
-  "Permanent Strategy": "Lock in an enduring protocol strategy",
+  "Defend Chart":  "Spend Decision Vault SOL to buy $PULSE on Jupiter and burn it",
+  "Split Rewards": "Airdrop the Decision Vault pool to holders by conviction weight",
 };
 
 function formatCountdown(closesAt: string): string {

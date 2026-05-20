@@ -18,26 +18,6 @@ export function mountAdminApi(app: Express): void {
 
   app.use("/admin", requireAdmin);
 
-  // Set the target mint for a Treasury Trade or Pulse Wars vote.
-  // POST /admin/votes/:id/target  { target_mint: "<base58>" }
-  app.post("/admin/votes/:id/target", async (req: Request, res: Response) => {
-    const { target_mint } = req.body ?? {};
-    if (typeof target_mint !== "string" || target_mint.length < 32) {
-      return res.status(400).json({ error: "target_mint required" });
-    }
-    const r = await pool.query<{ id: string }>(
-      "UPDATE active_votes SET target_mint = $1 WHERE id = $2 AND status = 'open' RETURNING id",
-      [target_mint, req.params.id],
-    );
-    if (r.rowCount === 0) return res.status(404).json({ error: "open vote not found" });
-    await logActivity(
-      "VOTE_OPENED",
-      `Target mint set on vote ${req.params.id}`,
-      { voteId: req.params.id, target_mint },
-    );
-    res.json({ ok: true });
-  });
-
   // Toggle the pause flag.
   // POST /admin/pause  { paused: true | false }
   app.post("/admin/pause", async (req: Request, res: Response) => {

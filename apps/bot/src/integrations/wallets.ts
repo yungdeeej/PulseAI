@@ -6,21 +6,11 @@ import { primaryConnection } from "./helius.js";
 import { buildTipTx, submitBundle } from "./jito.js";
 import { MAX_TX_SOL } from "../config/constants.js";
 
-export type VaultName =
-  | "BOT"
-  | "BURN"
-  | "DEFENSE"
-  | "REWARDS"
-  | "LIQUIDITY"
-  | "OPERATIONS";
+export type VaultName = "BOT" | "BURN";
 
 const envKeyMap: Record<VaultName, keyof typeof env> = {
   BOT: "BOT_WALLET_PRIVATE_KEY",
   BURN: "BURN_VAULT_PRIVATE_KEY",
-  DEFENSE: "DEFENSE_VAULT_PRIVATE_KEY",
-  REWARDS: "REWARDS_VAULT_PRIVATE_KEY",
-  LIQUIDITY: "LIQUIDITY_VAULT_PRIVATE_KEY",
-  OPERATIONS: "OPERATIONS_VAULT_PRIVATE_KEY",
 };
 
 const cache = new Map<VaultName, Keypair>();

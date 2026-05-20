@@ -6,7 +6,6 @@ import {
   REWARDS_MIN_HOLD_DAYS,
 } from "../config/constants.js";
 import {
-  getBotConfig,
   getTokenState,
   getVault,
   logActivity,
@@ -30,69 +29,27 @@ export interface RewardComputation {
   payoutSol: number;
 }
 
-export async function distributeWeeklyRewards(): Promise<void> {
-  const cfg = await getBotConfig();
-  if (cfg.paused || !cfg.rewards_enabled) {
-    logger.info("rewards disabled or paused");
-    return;
-  }
-  await distributeFromVault({
-    vaultKind: "REWARDS",
-    payerKey: "REWARDS",
-    activityKind: "REWARDS_DISTRIBUTION",
-    label: "Weekly rewards",
-    icon: "💸",
-  });
-}
-
 /**
- * Holder Airdrop voting outcome: redistribute the Decision Vault's pool
+ * Split Rewards voting outcome: redistribute the Decision Vault's pool
  * proportionally to qualifying holders, weighted by Conviction Score.
- *
- * Same compute path as the weekly rewards distributor, but draws from the
- * Decision Vault (where Treasury Decision funds accumulate) and is signed
- * by the BOT keypair (which controls the Decision Vault per the spec).
+ * Signed by the BOT keypair, which controls the Decision Vault per spec.
  */
 export async function airdropFromDecisionVault(poolSol: number): Promise<{
   recipients: number;
   total_sol: number;
   signatures: (string | null)[];
 }> {
-  return distributeFromVault({
-    vaultKind: "DECISION",
-    payerKey: "BOT",
-    activityKind: "AIRDROP",
-    label: "Holder Airdrop",
-    icon: "🪂",
-    poolSolOverride: poolSol,
-  });
-}
-
-interface DistributeArgs {
-  vaultKind: "REWARDS" | "DECISION";
-  payerKey: "REWARDS" | "BOT";
-  activityKind: "REWARDS_DISTRIBUTION" | "AIRDROP";
-  label: string;
-  icon: string;
-  poolSolOverride?: number;
-}
-
-async function distributeFromVault(args: DistributeArgs): Promise<{
-  recipients: number;
-  total_sol: number;
-  signatures: (string | null)[];
-}> {
-  const vault = await getVault(args.vaultKind);
-  if (!vault) throw new Error(`${args.vaultKind} vault missing`);
-  const poolSol = args.poolSolOverride ?? Number(vault.balance_sol);
-  if (poolSol <= 0) {
-    logger.info({ vault: args.vaultKind }, "vault empty; skipping distribution");
+  const vault = await getVault("DECISION");
+  if (!vault) throw new Error("DECISION vault missing");
+  const pool_ = poolSol ?? Number(vault.balance_sol);
+  if (pool_ <= 0) {
+    logger.info("decision vault empty; skipping airdrop");
     return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
-  const allocations = await computeAllocations(poolSol);
+  const allocations = await computeAllocations(pool_);
   if (allocations.length === 0) {
-    logger.info({ label: args.label }, "no eligible recipients");
+    logger.info("no eligible recipients for split rewards");
     return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
@@ -100,26 +57,25 @@ async function distributeFromVault(args: DistributeArgs): Promise<{
   if (!(await tryReserveDailyBudget(totalDeploy))) {
     await logActivity(
       "SAFETY_HALT",
-      `${args.label} skipped — daily SOL budget would be exceeded (${formatSol(totalDeploy)}).`,
-      { totalDeploy, vault: args.vaultKind },
+      `Split Rewards skipped — daily SOL budget would be exceeded (${formatSol(totalDeploy)}).`,
+      { totalDeploy },
     );
     return { recipients: 0, total_sol: 0, signatures: [] };
   }
 
-  const summary = await sendBatched(allocations, args.payerKey);
+  const summary = await sendBatched(allocations);
   await logActivity(
-    args.activityKind,
-    `${args.icon} ${args.label}: ${formatSol(totalDeploy)} → ${allocations.length} wallets across ${summary.batches} batches.`,
+    "AIRDROP",
+    `🪂 Split Rewards: ${formatSol(totalDeploy)} → ${allocations.length} wallets across ${summary.batches} batches.`,
     {
       total_sol: totalDeploy,
       recipients: allocations.length,
       batches: summary.batches,
       signatures: summary.signatures,
-      vault: args.vaultKind,
     },
   );
 
-  const post = `${args.icon} ${args.label} distributed: ${formatSol(totalDeploy)} → ${allocations.length} holders.`;
+  const post = `🪂 Split Rewards distributed: ${formatSol(totalDeploy)} → ${allocations.length} holders.`;
   await postTelegram(post);
   return { recipients: allocations.length, total_sol: totalDeploy, signatures: summary.signatures };
 }
@@ -194,17 +150,14 @@ interface BatchSummary {
   signatures: (string | null)[];
 }
 
-async function sendBatched(
-  allocations: RewardComputation[],
-  payerKey: "REWARDS" | "BOT" = "REWARDS",
-): Promise<BatchSummary> {
+async function sendBatched(allocations: RewardComputation[]): Promise<BatchSummary> {
   const signatures: (string | null)[] = [];
   if (env.DRY_RUN) {
-    logger.info({ recipients: allocations.length, payerKey }, "[DRY-RUN] skipping transfer");
+    logger.info({ recipients: allocations.length }, "[DRY-RUN] skipping airdrop transfer");
     return { batches: Math.ceil(allocations.length / REWARDS_BATCH_SIZE), signatures };
   }
 
-  const payer = loadKeypair(payerKey);
+  const payer = loadKeypair("BOT");
   const conn = primaryConnection();
 
   const batches = chunk(allocations, REWARDS_BATCH_SIZE);
@@ -229,7 +182,7 @@ async function sendBatched(
       await conn.confirmTransaction(sig, "confirmed");
       signatures.push(sig);
     } catch (err) {
-      logger.error({ err }, "rewards batch failed");
+      logger.error({ err }, "airdrop batch failed");
       signatures.push(null);
     }
   }

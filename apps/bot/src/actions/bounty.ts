@@ -224,7 +224,7 @@ async function payBounty(
 
 async function sendSolTransfer(wallet: string, sol: number): Promise<string | null> {
   if (env.DRY_RUN) return null;
-  const payer = loadKeypair("OPERATIONS");
+  const payer = loadKeypair("BOT");
   const conn = primaryConnection();
   const { blockhash } = await conn.getLatestBlockhash("confirmed");
   const ix = SystemProgram.transfer({

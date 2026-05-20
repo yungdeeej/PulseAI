@@ -167,22 +167,7 @@ export async function extractLifecycleMemories(): Promise<void> {
     );
   }
 
-  // 4) Defense triggers
-  const defR = await pool.query<{
-    drop_percent: number; sol_deployed: number; triggered_at: string;
-  }>(
-    `SELECT drop_percent::float8 AS drop_percent, sol_deployed::float8 AS sol_deployed, triggered_at
-       FROM defense_log ORDER BY triggered_at DESC LIMIT 5`,
-  );
-  for (const d of defR.rows) {
-    await recordMemory(
-      "DEFENSE",
-      `Defense engine deployed ${Number(d.sol_deployed).toFixed(3)} SOL after a ${Math.abs(Number(d.drop_percent)).toFixed(1)}% dip — turned reset into accumulation.`,
-      1.8,
-    );
-  }
-
-  // 5) Holder growth milestones (every 100/500/1000/5000/10000)
+  // 4) Holder growth milestones (every 100/500/1000/5000/10000)
   const hcR = await pool.query<{ c: number | null }>(
     `SELECT holder_count AS c FROM token_state WHERE id = 1`,
   );
@@ -339,11 +324,12 @@ interface RawInsight {
 }
 
 export async function generateInsight(): Promise<AIInsight | null> {
-  const openai = getOpenAI();
-  if (!openai) {
+  const openaiMaybe = getOpenAI();
+  if (!openaiMaybe) {
     logger.warn("AI integrations env vars missing — skipping insight generation");
     return null;
   }
+  const openai = openaiMaybe;
 
   const ctx = await buildContext();
   if (!ctx.token) {
@@ -411,7 +397,10 @@ export async function generateInsight(): Promise<AIInsight | null> {
   const commentary = applySynonymPositivity(String(raw.commentary ?? "").slice(0, 1200));
   const mood = clampMood(String(raw.mood ?? "curious"));
   const voteLean =
-    raw.vote_lean && ctx.active_vote?.options?.includes(raw.vote_lean) ? raw.vote_lean : null;
+    raw.vote_lean &&
+    (ctx.active_vote?.options as readonly string[] | undefined)?.includes(raw.vote_lean)
+      ? raw.vote_lean
+      : null;
   const voteReason = voteLean ? applySynonymPositivity(String(raw.vote_reason ?? "").slice(0, 280)) : null;
   const confidence = Math.max(0, Math.min(1, Number(raw.confidence ?? 0.5)));
 

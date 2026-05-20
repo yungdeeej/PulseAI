@@ -3,10 +3,7 @@ import { env, loadEnv } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { createWebhookApp } from "./monitors/heliusWebhook.js";
 import { syncAll } from "./monitors/stateSync.js";
-import { defenseTick } from "./actions/defense.js";
-import { mmTick } from "./actions/marketMaker.js";
 import { startVolumeGenerator, stopVolumeGenerator } from "./actions/volumeGenerator.js";
-import { distributeWeeklyRewards } from "./actions/rewards.js";
 import { tickClosingVotes } from "./voting/tallyVote.js";
 import { recordPriceSample } from "./monitors/priceTracker.js";
 import { startDryRunGenerator, stopDryRunGenerator } from "./monitors/dryRunGenerator.js";
@@ -17,8 +14,6 @@ import { generateInsight, extractLifecycleMemories } from "./features/aiConsciou
 import {
   BETTERSTACK_PING_MS,
   BOT_CONFIG_POLL_MS,
-  DEFENSE_LOOP_INTERVAL_MS,
-  MM_STATE_INTERVAL_MS,
   STATE_SYNC_INTERVAL_MS,
 } from "./config/constants.js";
 import { pingHeartbeat } from "./utils/heartbeat.js";
@@ -77,21 +72,7 @@ async function main() {
     }, STATE_SYNC_INTERVAL_MS),
   );
 
-  // 4. Defense loop
-  timers.push(
-    setInterval(() => {
-      defenseTick().catch((err) => logger.error({ err }, "defense tick failed"));
-    }, DEFENSE_LOOP_INTERVAL_MS),
-  );
-
-  // 5. MM state publisher
-  timers.push(
-    setInterval(() => {
-      mmTick().catch((err) => logger.error({ err }, "mm tick failed"));
-    }, MM_STATE_INTERVAL_MS),
-  );
-
-  // 6. Volume bot (self-scheduling)
+  // 4. Volume bot (self-scheduling)
   startVolumeGenerator();
 
   // 6b. Dry-run synthetic data (no-op when DRY_RUN=false)
@@ -126,10 +107,6 @@ async function main() {
   // Daily streak refresh — 00:00 UTC
   cron.schedule("0 0 * * *", () => {
     recomputeAllStreaks().catch((err) => logger.error({ err }, "streak refresh failed"));
-  });
-  // Weekly rewards — Sunday 00:00 UTC
-  cron.schedule("0 0 * * 0", () => {
-    distributeWeeklyRewards().catch((err) => logger.error({ err }, "rewards failed"));
   });
   // AI consciousness — extract durable memories first, then reflect.
   // Runs every 5 minutes plus a single warm-up shortly after boot.

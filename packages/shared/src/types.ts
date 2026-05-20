@@ -22,9 +22,6 @@ export interface BotConfig {
   id: 1;
   paused: boolean;
   dry_run: boolean;
-  defense_enabled: boolean;
-  mm_enabled: boolean;
-  rewards_enabled: boolean;
   volume_gen_enabled: boolean;
   max_daily_sol_deployed: number;
   daily_sol_deployed: number;
@@ -138,7 +135,6 @@ export interface ActiveVote {
   closes_at: string;
   status: VoteStatus;
   winning_option: VoteOption | null;
-  target_mint: string | null;
 }
 
 export interface VoteRecord {

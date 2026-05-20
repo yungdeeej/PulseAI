@@ -1,34 +1,33 @@
 import { describe, it, expect } from "vitest";
-import { VOTE_OPTIONS_BY_TIER } from "@pulse/shared";
+import { VOTE_OPTIONS, VOTE_OPTIONS_BY_TIER } from "@pulse/shared";
 import { isExecutable } from "../src/voting/executeVote.js";
 
 describe("vote options & tally", () => {
-  it("Tier 1 has Buy+Burn and Hold&Compound", () => {
-    expect(VOTE_OPTIONS_BY_TIER[1]).toEqual(["Buy + Burn", "Hold & Compound"]);
+  it("every tier (including tier 0) offers the binary ballot", () => {
+    for (const tier of [0, 1, 2, 3, 4] as const) {
+      expect(VOTE_OPTIONS_BY_TIER[tier]).toEqual(["Defend Chart", "Split Rewards"]);
+    }
   });
 
-  it("Tier 3 has six options", () => {
-    expect(VOTE_OPTIONS_BY_TIER[3].length).toBe(6);
+  it("ballot has exactly two options", () => {
+    expect(VOTE_OPTIONS.length).toBe(2);
   });
 
-  it("every option in every tier has an executor", () => {
-    for (const tier of [1, 2, 3, 4] as const) {
-      for (const opt of VOTE_OPTIONS_BY_TIER[tier]) {
-        expect(isExecutable(opt), `missing executor for ${opt}`).toBe(true);
-      }
+  it("every binary option has an executor", () => {
+    for (const opt of VOTE_OPTIONS) {
+      expect(isExecutable(opt), `missing executor for ${opt}`).toBe(true);
     }
   });
 
   it("tally picks the option with highest weight sum", () => {
     const tallies: Record<string, number> = {
-      "Buy + Burn": 1500,
-      "Hold": 1200,
-      "Reinforce MM": 1800,
+      "Defend Chart": 1500,
+      "Split Rewards": 1800,
     };
     const winner = Object.entries(tallies).reduce(
-      (best, [k, v]) => (v > best[1] ? [k, v] as const : best),
+      (best, [k, v]) => (v > best[1] ? ([k, v] as const) : best),
       ["", -Infinity] as readonly [string, number],
     )[0];
-    expect(winner).toBe("Reinforce MM");
+    expect(winner).toBe("Split Rewards");
   });
 });

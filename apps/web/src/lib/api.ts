@@ -95,7 +95,6 @@ export interface ActiveVote {
   closes_at: string;
   status: "open" | "closed" | "executed";
   winning_option: string | null;
-  target_mint: string | null;
 }
 
 export interface TallyItem {

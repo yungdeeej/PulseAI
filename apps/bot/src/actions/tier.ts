@@ -7,8 +7,8 @@ import {
   getTokenState,
   insertTierTransition,
   lastTierTransition,
-  patchBotConfig,
   patchTokenState,
+  patchBotConfig,
   logActivity,
 } from "../db/queries.js";
 import { captureSnapshot } from "../features/snapshot.js";
@@ -73,9 +73,9 @@ export async function executeTierTransition(
 
   const snapshotCount = await captureSnapshot(to);
 
-  // Enable features per tier.
-  if (to >= 2) await patchBotConfig({ defense_enabled: true, mm_enabled: true });
-  if (to >= 3) await patchBotConfig({ rewards_enabled: true });
+  // Enable the volume generator from the first tier onward. All other
+  // legacy treasury feature flags collapsed into the single Decision Vault
+  // pipeline and no longer need per-tier gating.
   if (to >= 0) await patchBotConfig({ volume_gen_enabled: true });
 
   // Open Treasury Decision vote.

@@ -1,7 +1,7 @@
 import { Keypair } from "@solana/web3.js";
 import { tryLoadKeypair, type VaultName } from "./wallets.js";
 
-const VAULTS: VaultName[] = ["BOT", "BURN", "DEFENSE", "REWARDS", "LIQUIDITY", "OPERATIONS"];
+const VAULTS: VaultName[] = ["BOT", "BURN"];
 
 let cached: Set<string> | null = null;
 
@@ -16,17 +16,10 @@ export function knownBotAddresses(): Set<string> {
     const kp = tryLoadKeypair(v);
     if (kp) addrs.add(kp.publicKey.toBase58());
   }
-  // Also include vault address env vars (which may not have a private key).
-  for (const k of [
-    "DECISION_VAULT_ADDRESS",
-    "DEFENSE_VAULT_ADDRESS",
-    "REWARDS_VAULT_ADDRESS",
-    "LIQUIDITY_VAULT_ADDRESS",
-    "OPERATIONS_VAULT_ADDRESS",
-  ] as const) {
-    const v = process.env[k];
-    if (v) addrs.add(v);
-  }
+  // Also include the Decision Vault address env var (which may not have a
+  // private key locally — the BOT keypair controls it per spec).
+  const decisionAddr = process.env["DECISION_VAULT_ADDRESS"];
+  if (decisionAddr) addrs.add(decisionAddr);
   cached = addrs;
   return cached;
 }
@@ -41,4 +34,4 @@ export function isBotWallet(address: string): boolean {
 }
 
 // Side effect: ensure module always imports cleanly even if Keypair lookups throw.
-void Keypair; // hold reference to avoid tree-shake
+void Keypair;

@@ -1,18 +1,11 @@
 export type ActivityKind =
   | "TIER_UNLOCK"
-  | "DEFENSE"
-  | "MM_UPDATE"
-  | "VOLUME_BOT"
-  | "REWARDS_DISTRIBUTION"
   | "VOTE_OPENED"
   | "VOTE_CLOSED"
   | "VOTE_EXECUTED"
   | "BUY_BURN"
   | "AIRDROP"
-  | "REINFORCE_MM"
-  | "TREASURY_TRADE"
-  | "PULSE_WARS"
-  | "HOLD"
+  | "VOLUME_BOT"
   | "BOUNTY_OPENED"
   | "BOUNTY_FULFILLED"
   | "TWEET_BONUS_AWARDED"
@@ -23,19 +16,12 @@ export type ActivityKind =
 
 export const ACTIVITY_KINDS: readonly ActivityKind[] = [
   "TIER_UNLOCK",
-  "DEFENSE",
-  "MM_UPDATE",
-  "VOLUME_BOT",
-  "REWARDS_DISTRIBUTION",
   "VOTE_OPENED",
   "VOTE_CLOSED",
   "VOTE_EXECUTED",
   "BUY_BURN",
   "AIRDROP",
-  "REINFORCE_MM",
-  "TREASURY_TRADE",
-  "PULSE_WARS",
-  "HOLD",
+  "VOLUME_BOT",
   "BOUNTY_OPENED",
   "BOUNTY_FULFILLED",
   "TWEET_BONUS_AWARDED",

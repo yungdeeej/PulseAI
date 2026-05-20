@@ -9,10 +9,6 @@ import type { VaultKind } from "@pulse/shared";
 
 const vaultEnv: Record<VaultKind, keyof typeof env> = {
   DECISION: "DECISION_VAULT_ADDRESS",
-  DEFENSE: "DEFENSE_VAULT_ADDRESS",
-  REWARDS: "REWARDS_VAULT_ADDRESS",
-  LIQUIDITY: "LIQUIDITY_VAULT_ADDRESS",
-  OPERATIONS: "OPERATIONS_VAULT_ADDRESS",
 };
 
 export async function syncVaultBalances(): Promise<void> {

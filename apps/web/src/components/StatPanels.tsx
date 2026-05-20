@@ -117,7 +117,6 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
   const tierProgress = TIER_PROGRESS[tier] ?? 5;
 
   const decisionVault = vaults.find((v) => v.kind === "DECISION");
-  const defenseVault = vaults.find((v) => v.kind === "DEFENSE");
   const totalVaultSol = vaults.reduce((sum, v) => sum + Number(v.balance_sol), 0);
 
   const volume = Number(tokenState?.volume_24h_usd ?? 0);
@@ -258,8 +257,8 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
               {creator_wallet_sol !== null && creator_wallet_sol !== undefined
                 ? `CREATOR REWARDS · LIVE`
                 : decisionVault
-                  ? `DEC ${Number(decisionVault.balance_sol).toFixed(3)} · DEF ${Number(defenseVault?.balance_sol ?? 0).toFixed(3)}`
-                  : "5 vaults · online"}
+                  ? `DECISION VAULT · ${Number(decisionVault.balance_sol).toFixed(3)} SOL`
+                  : "decision vault · online"}
             </div>
           </div>
           <div style={{

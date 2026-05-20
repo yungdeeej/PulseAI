@@ -12,7 +12,7 @@ describe("vote signature end-to-end", () => {
     const kp = Keypair.generate();
     const wallet = kp.publicKey.toBase58();
     const voteId = "00000000-1111-2222-3333-444444444444";
-    const option = "Buy + Burn";
+    const option = "Defend Chart";
     const ts = new Date().toISOString();
 
     const message = canonicalVoteMessage({ voteId, option, ts });
@@ -35,14 +35,14 @@ describe("vote signature end-to-end", () => {
     const voteId = "11111111-1111-1111-1111-111111111111";
     const ts = new Date().toISOString();
     const real = nacl.sign.detached(
-      new TextEncoder().encode(canonicalVoteMessage({ voteId, option: "Hold", ts })),
+      new TextEncoder().encode(canonicalVoteMessage({ voteId, option: "Defend Chart", ts })),
       kp.secretKey,
     );
     const ok = verifyVoteSignature({
       wallet,
       signatureBase58: bs58.encode(real),
       voteId,
-      option: "Buy + Burn",
+      option: "Split Rewards",
       ts,
     });
     expect(ok).toBe(false);
@@ -52,7 +52,7 @@ describe("vote signature end-to-end", () => {
     const signer = Keypair.generate();
     const someoneElse = Keypair.generate();
     const voteId = "22222222-2222-2222-2222-222222222222";
-    const option = "Reinforce MM";
+    const option = "Split Rewards";
     const ts = new Date().toISOString();
     const sig = nacl.sign.detached(
       new TextEncoder().encode(canonicalVoteMessage({ voteId, option, ts })),

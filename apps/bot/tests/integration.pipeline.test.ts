@@ -15,7 +15,7 @@ interface FakeState {
     bpm: number;
     volume_24h_usd: number;
   };
-  botConfig: { paused: boolean; defense_enabled: boolean; mm_enabled: boolean; rewards_enabled: boolean; volume_gen_enabled: boolean };
+  botConfig: { paused: boolean; volume_gen_enabled: boolean };
   vaults: Record<string, { kind: string; address: string; balance_sol: number; balance_pulse: number }>;
   trades: { signature: string; wallet: string; side: string; sol_amount: number; pulse_amount: number; price_usd: number }[];
   holders: Map<string, { wallet: string; balance: number; first_seen_at: Date; updated_at: Date }>;
@@ -43,17 +43,10 @@ function reset() {
   };
   state.botConfig = {
     paused: false,
-    defense_enabled: false,
-    mm_enabled: false,
-    rewards_enabled: false,
     volume_gen_enabled: false,
   };
   state.vaults = {
     DECISION: { kind: "DECISION", address: "decision1111", balance_sol: 5, balance_pulse: 0 },
-    DEFENSE: { kind: "DEFENSE", address: "defense1111", balance_sol: 10, balance_pulse: 0 },
-    REWARDS: { kind: "REWARDS", address: "rewards1111", balance_sol: 0, balance_pulse: 0 },
-    LIQUIDITY: { kind: "LIQUIDITY", address: "liquidity1111", balance_sol: 0, balance_pulse: 0 },
-    OPERATIONS: { kind: "OPERATIONS", address: "operations1111", balance_sol: 0, balance_pulse: 0 },
   };
   state.trades = [];
   state.holders = new Map();
@@ -239,7 +232,7 @@ describe("trade → tier → snapshot → vote pipeline", () => {
     expect(state.activeVote).not.toBeNull();
     expect(state.activeVote?.status).toBe("open");
     expect(state.activeVote?.tier_id).toBe(1);
-    expect(state.activeVote?.options).toContain("Buy + Burn");
+    expect(state.activeVote?.options).toEqual(["Defend Chart", "Split Rewards"]);
 
     // Snapshot captured the qualifying holder.
     expect(state.snapshots.length).toBeGreaterThanOrEqual(1);

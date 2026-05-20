@@ -31,16 +31,8 @@ const schema = z.object({
 
   BOT_WALLET_PRIVATE_KEY: z.string().optional(),
   BURN_VAULT_PRIVATE_KEY: z.string().optional(),
-  DEFENSE_VAULT_PRIVATE_KEY: z.string().optional(),
-  REWARDS_VAULT_PRIVATE_KEY: z.string().optional(),
-  LIQUIDITY_VAULT_PRIVATE_KEY: z.string().optional(),
-  OPERATIONS_VAULT_PRIVATE_KEY: z.string().optional(),
 
   DECISION_VAULT_ADDRESS: z.string().optional(),
-  DEFENSE_VAULT_ADDRESS: z.string().optional(),
-  REWARDS_VAULT_ADDRESS: z.string().optional(),
-  LIQUIDITY_VAULT_ADDRESS: z.string().optional(),
-  OPERATIONS_VAULT_ADDRESS: z.string().optional(),
 
   JUPITER_API_URL: z.string().url().default("https://quote-api.jup.ag/v6"),
   JITO_AUTH_KEYPAIR: z.string().optional(),

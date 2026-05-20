@@ -18,14 +18,13 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE vault_kind_enum AS ENUM ('DECISION', 'DEFENSE', 'REWARDS', 'LIQUIDITY', 'OPERATIONS');
+  CREATE TYPE vault_kind_enum AS ENUM ('DECISION');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE TYPE activity_kind_enum AS ENUM (
-    'TIER_UNLOCK','DEFENSE','MM_UPDATE','VOLUME_BOT','REWARDS_DISTRIBUTION',
+    'TIER_UNLOCK','VOLUME_BOT',
     'VOTE_OPENED','VOTE_CLOSED','VOTE_EXECUTED','BUY_BURN','AIRDROP',
-    'REINFORCE_MM','TREASURY_TRADE','PULSE_WARS','HOLD',
     'BOUNTY_OPENED','BOUNTY_FULFILLED','TWEET_BONUS_AWARDED','NOTABLE_BUY',
     'SAFETY_HALT','DRY_RUN_NOTICE'
   );
@@ -64,9 +63,6 @@ CREATE TABLE IF NOT EXISTS bot_config (
   id                       SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   paused                   BOOLEAN  NOT NULL DEFAULT FALSE,
   dry_run                  BOOLEAN  NOT NULL DEFAULT TRUE,
-  defense_enabled          BOOLEAN  NOT NULL DEFAULT FALSE,
-  mm_enabled               BOOLEAN  NOT NULL DEFAULT FALSE,
-  rewards_enabled          BOOLEAN  NOT NULL DEFAULT FALSE,
   volume_gen_enabled       BOOLEAN  NOT NULL DEFAULT FALSE,
   max_daily_sol_deployed   NUMERIC(20, 6) NOT NULL DEFAULT 50,
   daily_sol_deployed       NUMERIC(20, 6) NOT NULL DEFAULT 0,
@@ -352,11 +348,7 @@ INSERT INTO bot_config  (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 INSERT INTO mm_state    (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO vaults (kind, address) VALUES
-  ('DECISION',   ''),
-  ('DEFENSE',    ''),
-  ('REWARDS',    ''),
-  ('LIQUIDITY',  ''),
-  ('OPERATIONS', '')
+  ('DECISION', '')
 ON CONFLICT (kind) DO NOTHING;
 
 -- ============================================================

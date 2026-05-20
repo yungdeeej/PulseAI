@@ -38,9 +38,9 @@ export async function volumeTick(): Promise<void> {
   if (cfg.paused || !cfg.volume_gen_enabled) return;
   if (!env.PULSE_MINT_ADDRESS) return;
 
-  const ops = await getVault("OPERATIONS");
-  if (!ops || Number(ops.balance_sol) < VOLUME_BOT_MAX_SOL * 2) {
-    logger.debug("ops vault too low for volume trade");
+  const decision = await getVault("DECISION");
+  if (!decision || Number(decision.balance_sol) < VOLUME_BOT_MAX_SOL * 2) {
+    logger.debug("decision vault too low for volume trade");
     return;
   }
 
@@ -50,9 +50,9 @@ export async function volumeTick(): Promise<void> {
     return;
   }
 
-  const opsKp = tryLoadKeypair("OPERATIONS");
+  const opsKp = tryLoadKeypair("BOT");
   if (!opsKp) {
-    logger.warn("OPERATIONS keypair missing; skipping volume trade");
+    logger.warn("BOT keypair missing; skipping volume trade");
     return;
   }
   const side = Math.random() < 0.55 ? "BUY" : "SELL";

@@ -6,17 +6,16 @@ const DASHBOARD_POLL_MS = 15_000;
 const ACTIVITY_POLL_MS = 10_000;
 
 const KIND_COLOR: Record<string, string> = {
-  DEFENSE: "rgb(255,110,110)",
-  MM_UPDATE: "rgb(120,210,255)",
   VOLUME: "rgb(80,200,255)",
-  REWARDS: "rgb(120,255,160)",
   VOTE_OPEN: "rgb(255,210,90)",
   VOTE_EXEC: "rgb(255,120,210)",
   AIRDROP: "rgb(120,255,160)",
   BURN: "rgb(255,110,110)",
+  BUY_BURN: "rgb(255,110,110)",
   TRADE: "rgb(150,200,240)",
   SNAPSHOT: "rgb(160,170,255)",
   TIER_CROSS: "rgb(255,210,90)",
+  TIER_UNLOCK: "rgb(255,210,90)",
   AI_INSIGHT: "rgb(220,180,255)",
 };
 
