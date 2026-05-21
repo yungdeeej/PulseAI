@@ -81,8 +81,28 @@ function ManifestoLine({ children }: { children: React.ReactNode }) {
 }
 
 export default function DocsPage() {
+  // The global CSS sets `overflow: hidden` on html/body/#root so the dashboard
+  // can lock the viewport around the blob. The docs page is a long-form
+  // document and needs to scroll — temporarily allow overflow while mounted
+  // and restore it on unmount.
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+    const prev = {
+      html: html.style.overflow,
+      body: body.style.overflow,
+      root: root?.style.overflow ?? "",
+    };
+    html.style.overflow = "auto";
+    body.style.overflow = "auto";
+    if (root) root.style.overflow = "auto";
     window.scrollTo(0, 0);
+    return () => {
+      html.style.overflow = prev.html;
+      body.style.overflow = prev.body;
+      if (root) root.style.overflow = prev.root;
+    };
   }, []);
 
   return (
