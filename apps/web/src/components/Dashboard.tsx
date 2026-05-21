@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import App from "../App";
 import BackgroundCanvas from "./BackgroundCanvas";
 import CursorOverlay from "./CursorOverlay";
@@ -6,10 +6,12 @@ import { LeftPanels } from "./StatPanels";
 import RightPanels from "./ActivityFeed";
 import VotingPanel from "./VotingPanel";
 import ConsciousnessPanel from "./ConsciousnessPanel";
-import FloatingSwap from "./FloatingSwap";
+import SwapModal from "./SwapModal";
 import MobileCollapse from "./MobileCollapse";
 import TierPromotionOverlay from "./TierPromotionOverlay";
 import { useIsMobile } from "../lib/useIsMobile";
+import { useDashboard } from "../lib/useDashboard";
+import { blobLive } from "../lib/blobLive";
 
 type MobileSection = "stats" | "consciousness" | "voting" | "activity" | null;
 
@@ -18,6 +20,23 @@ export default function Dashboard() {
   const [openSection, setOpenSection] = useState<MobileSection>("stats");
   const toggle = (s: Exclude<MobileSection, null>) =>
     setOpenSection((curr) => (curr === s ? null : s));
+
+  // Swap modal is owned at the dashboard level so the SWAP CTA in the
+  // left-column action row and the modal stay in sync, and the modal mounts
+  // above all panels and the blob.
+  const [swapOpen, setSwapOpen] = useState(false);
+  const { tokenState } = useDashboard();
+  const mintAddress = tokenState?.mint_address ?? null;
+  const [swapAccent, setSwapAccent] = useState(
+    () => `rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`,
+  );
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSwapAccent(`rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+  const openSwap = () => setSwapOpen(true);
 
   return (
     <div style={{
@@ -70,7 +89,7 @@ export default function Dashboard() {
             open={openSection === "stats"}
             onToggle={() => toggle("stats")}
           >
-            <LeftPanels mobile />
+            <LeftPanels mobile onSwapClick={openSwap} />
           </MobileCollapse>
 
           <MobileCollapse
@@ -103,17 +122,22 @@ export default function Dashboard() {
             <RightPanels mobile />
           </MobileCollapse>
 
-          <FloatingSwap mobile />
         </div>
       ) : (
         <>
-          <LeftPanels />
+          <LeftPanels onSwapClick={openSwap} />
           <VotingPanel />
           <RightPanels />
           <ConsciousnessPanel />
-          <FloatingSwap />
         </>
       )}
+
+      <SwapModal
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        mintAddress={mintAddress}
+        accent={swapAccent}
+      />
 
       <CursorOverlay />
       <TierPromotionOverlay />

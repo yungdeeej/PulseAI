@@ -107,7 +107,7 @@ function Waveform() {
   return <canvas ref={ref} style={{ display: "block" }} />;
 }
 
-export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
+export function LeftPanels({ mobile = false, onSwapClick }: { mobile?: boolean; onSwapClick?: () => void } = {}) {
   const { tokenState, vaults, priceHistory, change24h, creator_wallet_sol } = useDashboard();
   const [bpm, setBpm] = useState(72);
 
@@ -272,45 +272,96 @@ export function LeftPanels({ mobile = false }: { mobile?: boolean } = {}) {
         </div>
       </Card>
 
-      <ActionRow accent={accent} mintAddress={tokenState?.mint_address ?? null} />
+      <ActionRow accent={accent} mintAddress={tokenState?.mint_address ?? null} onSwapClick={onSwapClick} />
     </div>
   );
 }
 
 const X_URL = "https://x.com/pulsetoken";
 
-function ActionRow({ accent, mintAddress }: { accent: string; mintAddress: string | null }) {
+function ActionRow({ accent, mintAddress, onSwapClick }: { accent: string; mintAddress: string | null; onSwapClick?: () => void }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
     if (!mintAddress) return;
     try { await navigator.clipboard.writeText(mintAddress); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch { }
   };
-  const btnBase: React.CSSProperties = {
-    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    padding: "10px 12px",
+  const swapDisabled = !mintAddress;
+
+  const iconBtnBase: React.CSSProperties = {
+    flex: "0 0 44px", height: 40,
+    display: "flex", alignItems: "center", justifyContent: "center",
     background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
     border: "1px solid rgba(120,200,255,0.18)", borderRadius: 10, color: "#cfe6ff",
-    fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: "0.18em",
-    textTransform: "uppercase", cursor: mintAddress ? "pointer" : "default",
-    transition: "border-color 0.2s, box-shadow 0.2s", backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)", textDecoration: "none",
+    cursor: "pointer", transition: "border-color 0.2s, box-shadow 0.2s, color 0.2s",
+    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", textDecoration: "none",
   };
+
+  const swapBtnStyle: React.CSSProperties = {
+    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    height: 40,
+    borderRadius: 10,
+    fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5,
+    letterSpacing: "0.22em", fontWeight: 600, textTransform: "uppercase",
+    background: swapDisabled
+      ? "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))"
+      : `linear-gradient(180deg, ${accent}38, ${accent}18)`,
+    border: `1px solid ${swapDisabled ? "rgba(120,200,255,0.18)" : `${accent}88`}`,
+    color: swapDisabled ? "rgba(207,230,255,0.45)" : "#e7f1ff",
+    boxShadow: swapDisabled
+      ? "none"
+      : `0 0 0 1px ${accent}22 inset, 0 0 22px -8px ${accent}88, 0 14px 30px -18px ${accent}aa`,
+    cursor: swapDisabled ? "not-allowed" : "pointer",
+    transition: "border-color 0.2s, box-shadow 0.25s, transform 0.2s",
+    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+  };
+
   return (
     <div style={{ display: "flex", gap: 8 }}>
-      <button type="button" onClick={onCopy} style={{ ...btnBase,
+      <button
+        type="button"
+        disabled={swapDisabled}
+        onClick={() => { if (!swapDisabled) onSwapClick?.(); }}
+        style={swapBtnStyle}
+        title={swapDisabled ? "Contract pending" : "Swap SOL → $PULSE"}
+        aria-label={swapDisabled ? "Swap pending — contract not yet set" : "Swap SOL to $PULSE"}
+        onMouseEnter={(e) => { if (!swapDisabled) {
+          e.currentTarget.style.borderColor = `${accent}cc`;
+          e.currentTarget.style.boxShadow = `0 0 0 1px ${accent}44 inset, 0 0 32px -4px ${accent}aa, 0 18px 36px -14px ${accent}cc`;
+        } }}
+        onMouseLeave={(e) => { if (!swapDisabled) {
+          e.currentTarget.style.borderColor = `${accent}88`;
+          e.currentTarget.style.boxShadow = `0 0 0 1px ${accent}22 inset, 0 0 22px -8px ${accent}88, 0 14px 30px -18px ${accent}aa`;
+        } }}
+      >
+        {!swapDisabled && (
+          <span style={{
+            display: "inline-block", width: 7, height: 7, borderRadius: "50%",
+            background: accent, boxShadow: `0 0 8px ${accent}, 0 0 14px ${accent}`,
+            animation: "pulseDot 1.6s ease-in-out infinite", flexShrink: 0,
+          }} />
+        )}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <path d="M7 7h13M7 7l4-4M7 7l4 4M17 17H4M17 17l-4-4M17 17l-4 4" />
+        </svg>
+        <span>{swapDisabled ? "SWAP // SOON" : "SWAP"}</span>
+      </button>
+
+      <button type="button" onClick={onCopy} style={{ ...iconBtnBase,
         color: copied ? "#7aff9f" : "#cfe6ff",
         borderColor: copied ? "rgba(120,255,160,0.55)" : "rgba(120,200,255,0.22)",
         boxShadow: copied ? "0 0 18px -6px rgba(120,255,160,0.55)" : "none",
-        opacity: mintAddress ? 1 : 0.5 }}
+        opacity: mintAddress ? 1 : 0.5,
+        cursor: mintAddress ? "pointer" : "default" }}
         onMouseEnter={(e) => { if (!copied && mintAddress) { e.currentTarget.style.borderColor = accent; e.currentTarget.style.boxShadow = `0 0 18px -6px ${accent}`; } }}
         onMouseLeave={(e) => { if (!copied) { e.currentTarget.style.borderColor = "rgba(120,200,255,0.22)"; e.currentTarget.style.boxShadow = "none"; } }}
-        title={mintAddress ?? "Contract address not yet set"}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        title={mintAddress ? `Copy CA · ${mintAddress}` : "Contract address not yet set"}
+        aria-label={copied ? "Contract address copied" : mintAddress ? "Copy contract address" : "Contract address pending"}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
-        <span>{copied ? "COPIED" : mintAddress ? "COPY CA" : "CA TBA"}</span>
       </button>
-      <a href={X_URL} target="_blank" rel="noopener noreferrer" style={{ ...btnBase, flex: "0 0 56px" }}
+
+      <a href={X_URL} target="_blank" rel="noopener noreferrer" style={iconBtnBase}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.boxShadow = `0 0 18px -6px ${accent}`; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(120,200,255,0.22)"; e.currentTarget.style.boxShadow = "none"; }}
         title="Follow on X" aria-label="Follow on X">
