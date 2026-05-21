@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import CursorOverlay from "./CursorOverlay";
 
 const ACCENT = "rgb(120,200,255)";
 const SUBTLE = "rgba(140,190,230,0.65)";
@@ -290,6 +291,9 @@ export default function DocsPage() {
           ◇ feelthepulse.xyz · solana · pump.fun
         </div>
       </div>
+
+      {/* Blue-glow custom cursor — matches the dashboard. Hidden on touch. */}
+      <CursorOverlay />
     </div>
   );
 }
