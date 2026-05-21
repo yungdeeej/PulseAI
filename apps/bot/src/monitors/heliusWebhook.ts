@@ -18,12 +18,46 @@ export function createWebhookApp() {
   const app = express();
   app.use(express.json({ limit: "5mb" }));
 
-  // CORS — allows the Vite dev server (port 5000) to call the API (port 3001)
-  app.use((_req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — public read API stays open ("*"), but sensitive write surfaces
+  // (/admin/*, POST /votes) only accept requests from our own origins so a
+  // hostile site embedded in a victim's browser can't trigger them. Bearer
+  // and Ed25519 auth are still the primary defense; this is defense-in-depth.
+  const ALLOWED_ORIGINS = new Set<string>([
+    "https://feelthepulse.xyz",
+    "https://www.feelthepulse.xyz",
+    "https://feelthepulse.replit.app",
+  ]);
+  const isAllowedOrigin = (origin: string | undefined): boolean => {
+    if (!origin) return false;
+    if (ALLOWED_ORIGINS.has(origin)) return true;
+    // Replit dev preview + localhost for local development
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      || /\.replit\.dev(:\d+)?$/.test(origin)
+      || /\.repl\.co(:\d+)?$/.test(origin);
+  };
+  const isSensitivePath = (req: { method: string; path: string }) =>
+    req.path.startsWith("/admin")
+    || (req.path === "/votes" && req.method === "POST");
+
+  app.use((req, res, next) => {
+    const origin = req.header("origin");
+    if (isSensitivePath(req)) {
+      // Strict allow-list for sensitive surfaces. Missing Origin (same-origin
+      // requests from our own SPA) is allowed; mismatched Origin is rejected.
+      if (origin && !isAllowedOrigin(origin)) {
+        return res.status(403).json({ error: "origin not allowed" });
+      }
+      if (origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+      }
+    } else {
+      // Public read API — open by design (cache headers + rate limits guard it).
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
-    if (_req.method === "OPTIONS") return res.sendStatus(204);
+    if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
 
