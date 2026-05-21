@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +41,30 @@ export function createWebhookApp() {
     next();
   });
 
+  // Rate limits — separate buckets so a flood on one surface can't lock out
+  // another. Keys on IP; behind Replit's proxy `app.set("trust proxy", true)`
+  // would be needed to use the forwarded IP, but rate-limit's default keyer
+  // is good enough as a baseline DoS guard.
+  app.set("trust proxy", 1);
+  const writeLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 10, // 10 vote/tweet submissions per IP per minute
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { error: "rate_limited" },
+  });
+  const readLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 240, // 4 req/s/IP — generous for legit dashboard polling
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { error: "rate_limited" },
+  });
+  app.use("/votes", (req, res, next) =>
+    req.method === "POST" ? writeLimiter(req, res, next) : next(),
+  );
+  app.use("/api", readLimiter);
+
   mountDashboardApi(app);
   mountPublicApi(app);
   mountAdminApi(app);
@@ -49,16 +74,21 @@ export function createWebhookApp() {
   });
 
   app.post("/helius/webhook", async (req: Request, res: Response) => {
-    if (env.HELIUS_WEBHOOK_SECRET) {
-      const provided = req.header("authorization") ?? req.header("x-helius-signature") ?? "";
-      const expected = env.HELIUS_WEBHOOK_SECRET;
-      const ok =
-        provided.length === expected.length &&
-        crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-      if (!ok) {
-        logger.warn("rejected helius webhook with bad secret");
-        return res.status(401).json({ error: "unauthorized" });
-      }
+    // Webhook is a write surface — fail closed if the secret isn't set.
+    // Previous behavior accepted unsigned payloads when env var was missing,
+    // which let any caller inject fake trades into the DB. Now: required.
+    if (!env.HELIUS_WEBHOOK_SECRET) {
+      logger.warn("rejected helius webhook — HELIUS_WEBHOOK_SECRET unset");
+      return res.status(503).json({ error: "webhook disabled" });
+    }
+    const provided = req.header("authorization") ?? req.header("x-helius-signature") ?? "";
+    const expected = env.HELIUS_WEBHOOK_SECRET;
+    const ok =
+      provided.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    if (!ok) {
+      logger.warn("rejected helius webhook with bad secret");
+      return res.status(401).json({ error: "unauthorized" });
     }
 
     const events = Array.isArray(req.body) ? req.body : [req.body];
