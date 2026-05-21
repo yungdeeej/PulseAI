@@ -57,6 +57,9 @@ interface SwapModalProps {
 export default function SwapModal({ open, onClose, mintAddress, accent }: SwapModalProps) {
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const initialisedRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // Lock body scroll while open
   useEffect(() => {
@@ -66,10 +69,34 @@ export default function SwapModal({ open, onClose, mintAddress, accent }: SwapMo
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  // Close on Escape
+  // Capture trigger element, move focus into the modal, restore on close.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    previousFocusRef.current = (document.activeElement as HTMLElement | null) ?? null;
+    // Defer to next frame so the close button is mounted.
+    const id = requestAnimationFrame(() => { closeBtnRef.current?.focus(); });
+    return () => {
+      cancelAnimationFrame(id);
+      previousFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Close on Escape + simple focus trap (Tab cycles within the modal).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab" || !cardRef.current) return;
+      const focusables = cardRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -168,7 +195,14 @@ export default function SwapModal({ open, onClose, mintAddress, accent }: SwapMo
 
   return (
     <div style={backdropStyle} onClick={onClose}>
-      <div style={cardStyle} onClick={e => e.stopPropagation()}>
+      <div
+        ref={cardRef}
+        style={cardStyle}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pulse-swap-title"
+      >
         {corners}
 
         {/* Header */}
@@ -179,7 +213,7 @@ export default function SwapModal({ open, onClose, mintAddress, accent }: SwapMo
           fontSize: 10, letterSpacing: "0.22em", color: "rgba(150,200,240,0.7)",
           textTransform: "uppercase",
         }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span id="pulse-swap-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{
               display: "inline-block", width: 7, height: 7, borderRadius: "50%",
               background: accent, boxShadow: `0 0 8px ${accent}, 0 0 14px ${accent}`,
@@ -188,6 +222,7 @@ export default function SwapModal({ open, onClose, mintAddress, accent }: SwapMo
             SWAP // $PULSE
           </span>
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={onClose}
             aria-label="Close swap"
