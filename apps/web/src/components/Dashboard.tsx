@@ -53,6 +53,40 @@ export default function Dashboard() {
         <App />
       </div>
 
+      {/* Top-right DOCS link — small, unobtrusive, sits opposite the centered title */}
+      <a
+        href="#/docs"
+        style={{
+          position: "fixed",
+          top: isMobile ? 10 : 20, right: isMobile ? 12 : 24, zIndex: 6,
+          display: "flex", alignItems: "center", gap: 6,
+          padding: isMobile ? "6px 10px" : "8px 12px",
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: isMobile ? 9 : 10, letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          color: "rgba(150,200,240,0.7)", textDecoration: "none",
+          background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
+          border: "1px solid rgba(120,200,255,0.18)",
+          borderRadius: 8,
+          backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+          transition: "border-color 0.2s, color 0.2s, box-shadow 0.2s",
+          pointerEvents: "auto",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = "rgba(120,200,255,0.55)";
+          e.currentTarget.style.color = "#cfe6ff";
+          e.currentTarget.style.boxShadow = "0 0 18px -6px rgba(120,200,255,0.55)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = "rgba(120,200,255,0.18)";
+          e.currentTarget.style.color = "rgba(150,200,240,0.7)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
+        aria-label="Open Pulse documentation"
+      >
+        <span>◇</span><span>DOCS</span>
+      </a>
+
       {/* Top center title strip */}
       <div style={{
         position: "fixed", top: isMobile ? 12 : 22, left: "50%",
