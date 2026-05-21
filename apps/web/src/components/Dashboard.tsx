@@ -36,7 +36,9 @@ export default function Dashboard() {
     }, 1000);
     return () => clearInterval(id);
   }, []);
-  const openSwap = () => setSwapOpen(true);
+  // Toggle: clicking the SWAP CTA again while the modal is open closes it,
+  // matching the AI consciousness button pattern.
+  const toggleSwap = () => setSwapOpen(v => !v);
 
   return (
     <div style={{
@@ -89,7 +91,7 @@ export default function Dashboard() {
             open={openSection === "stats"}
             onToggle={() => toggle("stats")}
           >
-            <LeftPanels mobile onSwapClick={openSwap} />
+            <LeftPanels mobile onSwapClick={toggleSwap} />
           </MobileCollapse>
 
           <MobileCollapse
@@ -125,7 +127,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <LeftPanels onSwapClick={openSwap} />
+          <LeftPanels onSwapClick={toggleSwap} />
           <VotingPanel />
           <RightPanels />
           <ConsciousnessPanel />
