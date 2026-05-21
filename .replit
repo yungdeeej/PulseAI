@@ -67,8 +67,8 @@ integrations = ["javascript_openai_ai_integrations:2.0.0"]
 [userenv]
 
 [userenv.shared]
-CREATOR_WALLET_ADDRESS = "9jRiNy7fdRCGd3C2aKujUBs1WufvyuxYMwDFzK1A9BVE"
-DECISION_VAULT_ADDRESS = "9jRiNy7fdRCGd3C2aKujUBs1WufvyuxYMwDFzK1A9BVE"
+CREATOR_WALLET_ADDRESS = "FUrm1sb3L9rMezVawcTsE3EGAJsrgSCg3Gt9kCWkJqEs"
+DECISION_VAULT_ADDRESS = "FUrm1sb3L9rMezVawcTsE3EGAJsrgSCg3Gt9kCWkJqEs"
 
 [postMerge]
 path = "scripts/post-merge.sh"
