@@ -16,6 +16,7 @@ import { openVote } from "../voting/openVote.js";
 import { logger } from "../utils/logger.js";
 import { postTelegram } from "../integrations/telegram.js";
 import { formatUsd } from "../utils/format.js";
+import { narrate } from "../features/narrator.js";
 
 const TIER_NAME = ["DISCOVERY", "IGNITION", "MOMENTUM", "CONVICTION", "ASCENSION"] as const;
 
@@ -98,4 +99,5 @@ export async function executeTierTransition(
     vote ? `\nVote open — closes <t:${Math.floor(new Date(vote.closes_at).getTime() / 1000)}:R>` : ""
   }`;
   await postTelegram(post);
+  narrate("tier_unlocked", { tier: def.name, snapshot_count: snapshotCount });
 }

@@ -62,6 +62,11 @@ const schema = z.object({
   HELIUS_WEBHOOK_SECRET: z.string().optional(),
   // Required to call any /admin/* endpoint. Generate with `openssl rand -hex 32`.
   ADMIN_SECRET: z.string().optional(),
+
+  // Claude-powered features (chat, narration, vote debates). When unset,
+  // every Claude surface degrades to a graceful no-op.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

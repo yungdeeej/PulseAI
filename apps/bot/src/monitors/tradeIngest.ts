@@ -18,6 +18,8 @@ import { computeBpm, pctChange } from "../utils/math.js";
 import { NOTABLE_BUY_SOL } from "../config/constants.js";
 import { postTelegram } from "../integrations/telegram.js";
 import { formatSol, formatUsd, shortAddress } from "../utils/format.js";
+import { emitLive } from "../api/events.js";
+import { narrate } from "../features/narrator.js";
 
 export interface ParsedTrade {
   signature: string;
@@ -52,6 +54,14 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
   const delta = t.side === "BUY" ? t.pulseAmount : -t.pulseAmount;
   await upsertHolderTrade(t.wallet, delta, t.observedAt);
 
+  // Real-time blob heartbeat — push the trade to connected dashboards.
+  emitLive("trade", {
+    side: t.side,
+    sol: +t.solAmount.toFixed(4),
+    wallet: shortAddress(t.wallet),
+    bot: botInitiated,
+  });
+
   const tph = await tradesPerHour();
   const vol24h = await volumeUsd24h();
   const supply = Number(process.env.PULSE_TOTAL_SUPPLY ?? 1_000_000_000);
@@ -81,6 +91,7 @@ export async function processTradeEvent(t: ParsedTrade): Promise<void> {
     )} of $PULSE (${formatSol(t.solAmount)}).`;
     await logActivity("NOTABLE_BUY", msg, { ...t });
     await postTelegram(msg);
+    narrate("notable_buy", { sol: t.solAmount, wallet: shortAddress(t.wallet) });
   }
 }
 

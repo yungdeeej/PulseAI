@@ -17,6 +17,7 @@ import type {
   WalletStatus,
 } from "@pulse/shared";
 import { query, queryOne, withTx } from "./pool.js";
+import { emitLive } from "../api/events.js";
 
 // ----------------------------------------------------------------
 // token_state (singleton)
@@ -146,6 +147,7 @@ export async function logActivity(
     [kind, summary, JSON.stringify(payload), txSignature],
   );
   if (!row) throw new Error("logActivity returned no row");
+  emitLive("activity", { id: row.id, kind: row.kind, summary: row.summary, created_at: row.created_at });
   return row;
 }
 
@@ -516,14 +518,15 @@ export async function archiveVote(
   executionTx: string | null = null,
 ): Promise<void> {
   await query(
-    `INSERT INTO vote_history (id, tier_id, options, tallies, decision_pool_sol, opens_at, closed_at, winning_option, execution_tx)
-     SELECT id, tier_id, options, $2::jsonb, decision_pool_sol, opens_at, NOW(), winning_option, $3
+    `INSERT INTO vote_history (id, tier_id, options, tallies, decision_pool_sol, opens_at, closed_at, winning_option, execution_tx, debate)
+     SELECT id, tier_id, options, $2::jsonb, decision_pool_sol, opens_at, NOW(), winning_option, $3, debate
        FROM active_votes WHERE id = $1
      ON CONFLICT (id) DO UPDATE
        SET tallies = EXCLUDED.tallies,
            closed_at = NOW(),
            winning_option = EXCLUDED.winning_option,
-           execution_tx = EXCLUDED.execution_tx`,
+           execution_tx = EXCLUDED.execution_tx,
+           debate = EXCLUDED.debate`,
     [voteId, JSON.stringify(tallies), executionTx],
   );
 }

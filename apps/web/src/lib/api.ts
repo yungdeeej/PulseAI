@@ -86,6 +86,12 @@ export async function fetchActivity(limit = 30): Promise<ActivityEvent[]> {
 
 // ─── Voting ───────────────────────────────────────────────────────────────────
 
+export interface VoteDebate {
+  cases: { option: string; argument: string }[];
+  lean: string | null;
+  lean_reason: string | null;
+}
+
 export interface ActiveVote {
   id: string;
   tier_id: string;
@@ -95,6 +101,7 @@ export interface ActiveVote {
   closes_at: string;
   status: "open" | "closed" | "executed";
   winning_option: string | null;
+  debate: VoteDebate | null;
 }
 
 export interface TallyItem {
@@ -151,4 +158,137 @@ export async function submitTweetUrl(
     body: JSON.stringify({ wallet, url }),
   });
   return res.json();
+}
+
+// ─── My Pulse: profile + leaderboard ─────────────────────────────────────────
+
+export interface ConvictionProfile {
+  wallet: string;
+  balance: number;
+  hold_days: number;
+  hold_multiplier: number;
+  status_flags: string[];
+  status_bonus: number;
+  streak_days: number;
+  reinforcement_count: number;
+  reinforcement_bonus: number;
+  tweet_multiplier_active: boolean;
+  weight: number;
+}
+
+export interface ProjectedShare {
+  pool_sol: number;
+  share_pct: number;
+  projected_sol: number;
+}
+
+export async function fetchProfile(wallet: string): Promise<{
+  profile: ConvictionProfile;
+  projected_split_rewards: ProjectedShare;
+} | null> {
+  const res = await fetch(`${BASE}/api/wallets/${encodeURIComponent(wallet)}/profile`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export interface LeaderboardEntry {
+  wallet: string;
+  weight: number;
+  streak_days: number;
+  hold_days: number;
+  status_flags: string[];
+}
+
+export async function fetchLeaderboard(): Promise<{
+  conviction: LeaderboardEntry[];
+  streaks: { wallet: string; current_days: number }[];
+}> {
+  const res = await fetch(`${BASE}/api/leaderboard`);
+  if (!res.ok) throw new Error(`leaderboard fetch failed: ${res.status}`);
+  return res.json();
+}
+
+// ─── Talk to PULSE ────────────────────────────────────────────────────────────
+
+export interface ChatQuota {
+  tier: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  balance: number;
+}
+
+export async function fetchChatQuota(token: string | null): Promise<{
+  quota: ChatQuota;
+  configured: boolean;
+  signed_in: boolean;
+} | null> {
+  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+  const res = await fetch(`${BASE}/api/chat/quota${qs}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function createChatSession(args: {
+  wallet: string;
+  ts: string;
+  signature: string;
+}): Promise<{ ok: boolean; token?: string; error?: string }> {
+  const res = await fetch(`${BASE}/api/chat/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  return res.json();
+}
+
+/**
+ * Stream a chat message. The endpoint replies with SSE frames over a POST
+ * body, so we parse the ReadableStream manually (EventSource is GET-only).
+ */
+export async function streamChat(args: {
+  message: string;
+  token: string | null;
+  onDelta: (text: string) => void;
+}): Promise<{ ok: boolean; error?: string; quota?: ChatQuota }> {
+  const res = await fetch(`${BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: args.message, token: args.token ?? undefined }),
+  });
+  if (!res.ok && !res.headers.get("content-type")?.includes("text/event-stream")) {
+    const data = await res.json().catch(() => ({}));
+    return { ok: false, error: data.error ?? `request failed (${res.status})` };
+  }
+  if (!res.body) return { ok: false, error: "no response body" };
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: { ok: boolean; error?: string; quota?: ChatQuota } = { ok: true };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      let event = "message";
+      let data = "";
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7).trim();
+        else if (line.startsWith("data: ")) data += line.slice(6);
+      }
+      if (!data) continue;
+      try {
+        const parsed = JSON.parse(data);
+        if (event === "delta" && typeof parsed.text === "string") args.onDelta(parsed.text);
+        else if (event === "done") result = { ok: true, quota: parsed.quota };
+        else if (event === "error") result = { ok: false, error: parsed.error, quota: parsed.quota ?? undefined };
+      } catch { /* skip malformed frame */ }
+    }
+  }
+  return result;
 }

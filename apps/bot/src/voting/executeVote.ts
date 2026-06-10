@@ -7,6 +7,7 @@ import { burnTokens } from "../utils/spl.js";
 import { logger } from "../utils/logger.js";
 import { formatSol } from "../utils/format.js";
 import { postTelegram } from "../integrations/telegram.js";
+import { narrate } from "../features/narrator.js";
 import type { VoteOption } from "@pulse/shared";
 
 interface VoteForExec {
@@ -33,6 +34,7 @@ export async function executeVote(voteId: string, winningOption: string): Promis
   await archiveVote(voteId, tallies, txSig);
   await logActivity("VOTE_EXECUTED", summary, { voteId, winningOption, txSig }, txSig);
   await postTelegram(summary);
+  narrate("vote_executed", { winning_option: winningOption, summary });
 }
 
 // ----------------------------------------------------------------

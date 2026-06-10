@@ -9,8 +9,11 @@ import ConsciousnessPanel from "./ConsciousnessPanel";
 import SwapModal from "./SwapModal";
 import MobileCollapse from "./MobileCollapse";
 import TierPromotionOverlay from "./TierPromotionOverlay";
+import ChatPanel from "./ChatPanel";
+import MyPulsePanel from "./MyPulsePanel";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useDashboard } from "../lib/useDashboard";
+import { useLiveStream } from "../lib/useLiveStream";
 import { blobLive } from "../lib/blobLive";
 
 type MobileSection = "stats" | "consciousness" | "voting" | "activity" | null;
@@ -25,7 +28,11 @@ export default function Dashboard() {
   // left-column action row and the modal stay in sync, and the modal mounts
   // above all panels and the blob.
   const [swapOpen, setSwapOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [myPulseOpen, setMyPulseOpen] = useState(false);
   const { tokenState } = useDashboard();
+  // Real-time SSE heartbeat: trades pulse the blob, narrations hit the feed.
+  useLiveStream();
   const mintAddress = tokenState?.mint_address ?? null;
   const [swapAccent, setSwapAccent] = useState(
     () => `rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`,
@@ -167,6 +174,39 @@ export default function Dashboard() {
           <ConsciousnessPanel />
         </>
       )}
+
+      {/* Bottom dock — the two flagship entrances: talk to the entity, see your stake */}
+      <div style={{
+        position: "fixed",
+        bottom: isMobile ? 10 : 22,
+        left: "50%", transform: "translateX(-50%)",
+        zIndex: 40, display: "flex", gap: 10, pointerEvents: "auto",
+      }}>
+        {([
+          ["◉ TALK TO PULSE", () => { setChatOpen(v => !v); setMyPulseOpen(false); }],
+          ["◇ MY PULSE", () => { setMyPulseOpen(v => !v); setChatOpen(false); }],
+        ] as const).map(([label, onClick]) => (
+          <button
+            key={label}
+            onClick={onClick}
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: isMobile ? 8.5 : 10, letterSpacing: "0.22em",
+              padding: isMobile ? "9px 13px" : "11px 18px",
+              color: "#cfe6ff", cursor: "pointer",
+              background: "linear-gradient(180deg, rgba(20,28,44,0.78), rgba(8,12,22,0.85))",
+              border: `1px solid ${swapAccent.replace("rgb", "rgba").replace(")", ",0.45)")}`,
+              borderRadius: 10,
+              backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+              boxShadow: `0 0 22px -8px ${swapAccent}`,
+              transition: "box-shadow 0.2s, border-color 0.2s",
+            }}
+          >{label}</button>
+        ))}
+      </div>
+
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      <MyPulsePanel open={myPulseOpen} onClose={() => setMyPulseOpen(false)} />
 
       <SwapModal
         open={swapOpen}

@@ -10,6 +10,9 @@ import { processTradeEvent, type ParsedTrade } from "./tradeIngest.js";
 import { mountPublicApi } from "../api/publicApi.js";
 import { mountAdminApi } from "../api/adminApi.js";
 import { mountDashboardApi } from "../api/dashboardApi.js";
+import { mountChatApi } from "../api/chatApi.js";
+import { mountProfileApi } from "../api/profileApi.js";
+import { mountSseApi } from "../api/events.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +74,8 @@ export function createWebhookApp() {
       res.setHeader("Cache-Control", "public, max-age=5, s-maxage=5, stale-while-revalidate=15");
     } else if (p === "/api/consciousness" || p === "/api/votes") {
       res.setHeader("Cache-Control", "public, max-age=10, s-maxage=10, stale-while-revalidate=30");
+    } else if (p === "/api/leaderboard") {
+      res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30, stale-while-revalidate=60");
     }
     next();
   });
@@ -102,6 +107,9 @@ export function createWebhookApp() {
   mountDashboardApi(app);
   mountPublicApi(app);
   mountAdminApi(app);
+  mountChatApi(app);
+  mountProfileApi(app);
+  mountSseApi(app);
 
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, dry_run: env.DRY_RUN, network: env.NETWORK });
