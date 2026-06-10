@@ -166,7 +166,7 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
     ? { width: "100%", animation: "panelIn 0.6s ease-out" }
     : {
         position: "fixed",
-        bottom: 60, left: "50%", transform: "translateX(-50%)",
+        bottom: 110, left: "50%", transform: "translateX(-50%)",
         width: 400, zIndex: 5,
         animation: "panelIn 0.5s ease-out",
       };

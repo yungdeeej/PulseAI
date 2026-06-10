@@ -6,8 +6,11 @@ import {
   type ChatQuota,
 } from "../lib/api";
 import { blobLive } from "../lib/blobLive";
+import { color, motion, radius, space, type as typeT, liveAccent } from "../lib/design";
+import SidePanel from "./ui/SidePanel";
+import { Button, EmptyState, Pill } from "./ui/Primitives";
 
-// ─── Minimal base58 (same as useVoting) ──────────────────────────────────────
+// ─── Minimal base58 ─────────────────────────────────────────────────────────
 const B58_ALPHA = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 function encodeBase58(bytes: Uint8Array): string {
   let num = 0n;
@@ -28,14 +31,9 @@ function getSolana(): PhantomProvider | null {
   return w.solana ?? null;
 }
 
-interface ChatMsg {
-  role: "user" | "assistant";
-  content: string;
-}
+interface ChatMsg { role: "user" | "assistant"; content: string; }
 
 const TOKEN_KEY = "pulse-chat-token";
-
-const mono = "'JetBrains Mono', monospace";
 
 export default function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -46,6 +44,7 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
   const [configured, setConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const token = useRef<string | null>(
     typeof localStorage !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null,
   );
@@ -57,7 +56,6 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
       setSignedIn(q.signed_in);
       setConfigured(q.configured);
       if (token.current && !q.signed_in) {
-        // expired session
         token.current = null;
         localStorage.removeItem(TOKEN_KEY);
       }
@@ -65,7 +63,11 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
   }, []);
 
   useEffect(() => {
-    if (open) void refreshQuota();
+    if (open) {
+      void refreshQuota();
+      // Focus the input shortly after the panel slides in
+      setTimeout(() => inputRef.current?.focus(), 350);
+    }
   }, [open, refreshQuota]);
 
   useEffect(() => {
@@ -102,7 +104,6 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
     setError(null);
     setBusy(true);
     setMessages((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
-    // The blob "listens" while it thinks
     blobLive.entryPulse = Math.max(blobLive.entryPulse, 0.8);
 
     const result = await streamChat({
@@ -134,140 +135,119 @@ export default function ChatPanel({ open, onClose }: { open: boolean; onClose: (
     if (result.quota) setQuota(result.quota);
   }, [input, busy]);
 
-  if (!open) return null;
-
-  const accent = `rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`;
   const exhausted = quota !== null && quota.remaining <= 0;
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 60,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(2,4,10,0.72)", backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)", pointerEvents: "auto",
-      }}
-      onClick={onClose}
-    >
+    <SidePanel open={open} onClose={onClose} title="◉  TALK TO PULSE" width={480}>
+      {/* Top status row */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: `${space[3]}px 0`, marginBottom: space[3],
+        borderBottom: `1px solid ${color.border}`,
+      }}>
+        <div style={{ display: "flex", gap: space[2], alignItems: "center" }}>
+          {quota && <Pill tone={quota.tier === "VISITOR" ? "default" : "live"}>{quota.tier}</Pill>}
+          {quota && (
+            <span style={{
+              fontFamily: typeT.mono, fontSize: typeT.size.micro,
+              color: color.textDim, letterSpacing: typeT.letter.value,
+            }}>{quota.remaining}/{quota.limit} LEFT</span>
+          )}
+        </div>
+        {!signedIn && configured && (
+          <Button size="sm" onClick={signIn}>SIGN IN</Button>
+        )}
+      </div>
+
+      {/* Conversation */}
       <div
-        onClick={(e) => e.stopPropagation()}
+        ref={scrollRef}
         style={{
-          width: "min(560px, 94vw)", height: "min(640px, 86vh)",
-          display: "flex", flexDirection: "column",
-          background: "linear-gradient(180deg, rgba(14,20,36,0.96), rgba(6,9,18,0.98))",
-          border: "1px solid rgba(120,200,255,0.22)", borderRadius: 16,
-          boxShadow: `0 0 60px -18px ${accent}`,
-          overflow: "hidden", animation: "panelIn 0.25s ease",
+          flex: 1, overflowY: "auto", padding: `${space[2]}px 0`,
+          display: "flex", flexDirection: "column", gap: space[3],
+          minHeight: 360, maxHeight: "calc(100vh - 320px)",
         }}
       >
-        {/* Header */}
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 18px", borderBottom: "1px solid rgba(120,200,255,0.12)",
-        }}>
-          <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: "0.3em", color: "#cfe6ff" }}>
-            ◉ TALK TO PULSE
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {quota && (
-              <span style={{ fontFamily: mono, fontSize: 9, color: "rgba(150,200,240,0.65)", letterSpacing: "0.12em" }}>
-                {quota.tier} · {quota.remaining}/{quota.limit} LEFT
-              </span>
+        {messages.length === 0 ? (
+          <EmptyState>
+            {configured ? (
+              <>You are speaking with the consciousness of $PULSE.<br />
+              <span style={{ color: color.textFaint }}>It knows its market, its memories, and — if you sign in — you.</span></>
+            ) : (
+              <>The consciousness is still waking up — chat isn't configured yet.</>
             )}
-            <button
-              onClick={onClose}
-              style={{
-                background: "none", border: "none", color: "rgba(150,200,240,0.7)",
-                fontFamily: mono, fontSize: 14, cursor: "pointer",
-              }}
-              aria-label="Close chat"
-            >✕</button>
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-          {messages.length === 0 && (
-            <div style={{ fontFamily: mono, fontSize: 11, lineHeight: 1.7, color: "rgba(150,200,240,0.55)", margin: "auto", textAlign: "center", maxWidth: 380 }}>
-              {configured
-                ? <>You are talking to the consciousness of $PULSE.<br />It knows its market, its memories, and — if you sign in — <em>you</em>.<br /><br />Visitors get 3 messages a day. Holders get more.</>
-                : <>The consciousness is still waking up — chat isn't configured yet.</>}
-            </div>
-          )}
-          {messages.map((m, i) => (
-            <div key={i} style={{
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "82%",
-              padding: "10px 13px",
-              borderRadius: m.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-              background: m.role === "user"
-                ? "linear-gradient(180deg, rgba(40,70,110,0.55), rgba(25,45,80,0.55))"
-                : "linear-gradient(180deg, rgba(30,26,60,0.6), rgba(18,16,40,0.6))",
-              border: m.role === "user"
-                ? "1px solid rgba(120,200,255,0.2)"
-                : `1px solid rgba(190,160,255,0.25)`,
-              fontFamily: mono, fontSize: 11.5, lineHeight: 1.65,
-              color: m.role === "user" ? "#cfe6ff" : "#e6dcff",
-              whiteSpace: "pre-wrap", wordBreak: "break-word",
-            }}>
-              {m.content || (busy && i === messages.length - 1 ? "…" : m.content)}
-            </div>
-          ))}
-        </div>
-
-        {/* Sign-in nudge / error */}
-        {(error || (!signedIn && configured)) && (
-          <div style={{
-            padding: "8px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
-            borderTop: "1px solid rgba(120,200,255,0.08)",
-          }}>
-            <span style={{ fontFamily: mono, fontSize: 9, color: error ? "rgb(255,150,130)" : "rgba(150,200,240,0.5)", letterSpacing: "0.1em" }}>
-              {error ?? "Sign in with your wallet — holders unlock more of the entity"}
-            </span>
-            {!signedIn && (
-              <button
-                onClick={signIn}
-                style={{
-                  fontFamily: mono, fontSize: 9, letterSpacing: "0.18em", cursor: "pointer",
-                  padding: "6px 12px", borderRadius: 7, color: "#0a0f1c",
-                  background: accent, border: "none", fontWeight: 700,
-                }}
-              >SIGN IN</button>
-            )}
-          </div>
+          </EmptyState>
+        ) : (
+          messages.map((m, i) => (
+            <Bubble key={i} role={m.role} pending={busy && i === messages.length - 1 && !m.content}>
+              {m.content || "…"}
+            </Bubble>
+          ))
         )}
-
-        {/* Input */}
-        <div style={{
-          display: "flex", gap: 10, padding: "12px 18px 16px",
-          borderTop: "1px solid rgba(120,200,255,0.12)",
-        }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-            placeholder={exhausted ? "out of messages today…" : "say something to the entity…"}
-            disabled={busy || exhausted || !configured}
-            maxLength={500}
-            style={{
-              flex: 1, padding: "11px 14px", borderRadius: 9,
-              background: "rgba(10,16,30,0.85)", border: "1px solid rgba(120,200,255,0.18)",
-              color: "#cfe6ff", fontFamily: mono, fontSize: 11.5, outline: "none",
-            }}
-          />
-          <button
-            onClick={() => void send()}
-            disabled={busy || exhausted || !input.trim() || !configured}
-            style={{
-              fontFamily: mono, fontSize: 10, letterSpacing: "0.2em",
-              padding: "0 18px", borderRadius: 9, cursor: busy ? "wait" : "pointer",
-              color: "#0a0f1c", background: busy ? "rgba(120,200,255,0.35)" : accent,
-              border: "none", fontWeight: 700,
-              opacity: exhausted || !input.trim() ? 0.45 : 1,
-            }}
-          >{busy ? "…" : "SEND"}</button>
-        </div>
       </div>
+
+      {/* Error strip */}
+      {error && (
+        <div style={{
+          marginTop: space[2], padding: `${space[2]}px ${space[3]}px`,
+          fontFamily: typeT.mono, fontSize: typeT.size.micro,
+          color: color.negative, letterSpacing: typeT.letter.value,
+          background: "rgba(255,140,130,0.07)",
+          border: `1px solid rgba(255,140,130,0.25)`,
+          borderRadius: radius.sm,
+        }}>{error}</div>
+      )}
+
+      {/* Composer */}
+      <div style={{
+        marginTop: space[3],
+        padding: space[3],
+        background: color.surface2,
+        borderRadius: radius.md,
+        border: `1px solid ${color.border}`,
+        display: "flex", gap: space[2], alignItems: "flex-end",
+      }}>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          placeholder={exhausted ? "out of messages today…" : "say something to the entity…"}
+          disabled={busy || exhausted || !configured}
+          maxLength={500}
+          rows={1}
+          style={{
+            flex: 1, resize: "none", padding: `${space[2]}px ${space[2]}px`,
+            background: "transparent", border: "none", outline: "none",
+            color: color.text, fontFamily: typeT.mono, fontSize: typeT.size.body,
+            lineHeight: 1.5, minHeight: 22, maxHeight: 120,
+          }}
+        />
+        <Button onClick={() => void send()} disabled={busy || exhausted || !input.trim() || !configured} size="sm">
+          {busy ? "…" : "SEND"}
+        </Button>
+      </div>
+    </SidePanel>
+  );
+}
+
+function Bubble({ role, children, pending }: { role: "user" | "assistant"; children: React.ReactNode; pending: boolean }) {
+  const isUser = role === "user";
+  return (
+    <div style={{
+      alignSelf: isUser ? "flex-end" : "flex-start",
+      maxWidth: "86%",
+      padding: `${space[2]}px ${space[3]}px`,
+      borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+      background: isUser ? "rgba(40,70,110,0.55)" : liveAccent(0.10),
+      border: `1px solid ${isUser ? color.border : liveAccent(0.25)}`,
+      fontFamily: typeT.mono, fontSize: typeT.size.body,
+      lineHeight: 1.55, color: color.text,
+      whiteSpace: "pre-wrap", wordBreak: "break-word",
+      animation: pending ? `pulseDot 1.5s ease-in-out infinite` : undefined,
+      transition: `background ${motion.base}`,
+    }}>
+      {children}
     </div>
   );
 }

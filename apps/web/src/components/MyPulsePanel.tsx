@@ -8,14 +8,11 @@ import {
   type LeaderboardEntry,
   type WalletBond,
 } from "../lib/api";
-import { blobLive } from "../lib/blobLive";
+import { color, radius, space, type as typeT, liveAccent } from "../lib/design";
+import SidePanel from "./ui/SidePanel";
+import { Button, EmptyState, Pill, SectionLabel, Stat, shortAddr } from "./ui/Primitives";
 
-const mono = "'JetBrains Mono', monospace";
 const WALLET_KEY = "pulse-my-wallet";
-
-function short(addr: string): string {
-  return addr.length > 10 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr;
-}
 
 interface PhantomProvider {
   publicKey: { toBase58(): string } | null;
@@ -26,38 +23,26 @@ function getSolana(): PhantomProvider | null {
   return w.solana ?? null;
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid rgba(120,200,255,0.07)" }}>
-      <span style={{ fontFamily: mono, fontSize: 9.5, letterSpacing: "0.15em", color: "rgba(150,200,240,0.55)" }}>{label}</span>
-      <span style={{ fontFamily: mono, fontSize: 10.5, color: accent ? "rgb(120,255,170)" : "#cfe6ff", fontWeight: accent ? 700 : 400 }}>{value}</span>
-    </div>
-  );
-}
+type Tab = "me" | "bond" | "board";
 
 export default function MyPulsePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [wallet, setWallet] = useState<string>(() => localStorage.getItem(WALLET_KEY) ?? "");
   const [input, setInput] = useState("");
   const [profile, setProfile] = useState<ConvictionProfile | null>(null);
   const [share, setShare] = useState<ProjectedShare | null>(null);
+  const [bond, setBond] = useState<WalletBond | null>(null);
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [streaks, setStreaks] = useState<{ wallet: string; current_days: number }[]>([]);
-  const [bond, setBond] = useState<WalletBond | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<"me" | "bond" | "board">("me");
+  const [tab, setTab] = useState<Tab>("me");
 
   const load = useCallback(async (addr: string) => {
     setLoading(true);
     try {
       const [data, bondData] = await Promise.all([fetchProfile(addr), fetchBond(addr)]);
-      if (data) {
-        setProfile(data.profile);
-        setShare(data.projected_split_rewards);
-      }
+      if (data) { setProfile(data.profile); setShare(data.projected_split_rewards); }
       setBond(bondData);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -86,234 +71,306 @@ export default function MyPulsePanel({ open, onClose }: { open: boolean; onClose
     localStorage.setItem(WALLET_KEY, addr);
   }, [input]);
 
-  if (!open) return null;
-  const accent = `rgb(${blobLive.bodyR | 0},${blobLive.bodyG | 0},${blobLive.bodyB | 0})`;
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "me", label: "MY STAKE" },
+    { key: "bond", label: "BOND" },
+    { key: "board", label: "LEADERBOARD" },
+  ];
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 60,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(2,4,10,0.72)", backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)", pointerEvents: "auto",
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(480px, 94vw)", maxHeight: "86vh", overflowY: "auto",
-          background: "linear-gradient(180deg, rgba(14,20,36,0.96), rgba(6,9,18,0.98))",
-          border: "1px solid rgba(120,200,255,0.22)", borderRadius: 16,
-          boxShadow: `0 0 60px -18px ${accent}`,
-          padding: "16px 20px 20px", animation: "panelIn 0.25s ease",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: "0.3em", color: "#cfe6ff" }}>◇ MY PULSE</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(150,200,240,0.7)", fontFamily: mono, fontSize: 14, cursor: "pointer" }} aria-label="Close">✕</button>
-        </div>
+    <SidePanel open={open} onClose={onClose} title="◇  MY PULSE" width={460}>
+      {/* Tabs */}
+      <div style={{
+        display: "flex", gap: space[1], padding: `${space[3]}px 0`,
+        borderBottom: `1px solid ${color.border}`,
+      }}>
+        {tabs.map((t) => {
+          const isActive = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                background: "none", border: "none",
+                padding: `${space[2]}px ${space[3]}px`,
+                fontFamily: typeT.mono, fontSize: typeT.size.micro,
+                letterSpacing: typeT.letter.label,
+                color: isActive ? color.text : color.textFaint,
+                cursor: "pointer", borderRadius: radius.sm,
+                fontWeight: isActive ? 600 : 400,
+                borderBottom: isActive ? `2px solid ${color.text}` : "2px solid transparent",
+              }}
+            >{t.label}</button>
+          );
+        })}
+      </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {([
-            ["me", "MY STAKE"],
-            ["bond", "BOND WITH PULSE"],
-            ["board", "LEADERBOARD"],
-          ] as const).map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              fontFamily: mono, fontSize: 9, letterSpacing: "0.18em", cursor: "pointer",
-              padding: "7px 12px", borderRadius: 7,
-              color: tab === t ? "#0a0f1c" : "rgba(150,200,240,0.7)",
-              background: tab === t ? accent : "rgba(20,30,50,0.6)",
-              border: tab === t ? "none" : "1px solid rgba(120,200,255,0.15)",
-              fontWeight: tab === t ? 700 : 400,
-            }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
+      <div style={{ paddingTop: space[4] }}>
         {tab === "me" ? (
           !wallet ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ fontFamily: mono, fontSize: 10, lineHeight: 1.7, color: "rgba(150,200,240,0.6)" }}>
-                See your conviction score, multipliers, streak, and what the next
-                "Split Rewards" payout would send you.
-              </div>
-              <button onClick={connect} style={{
-                fontFamily: mono, fontSize: 10, letterSpacing: "0.2em", cursor: "pointer",
-                padding: "11px 0", borderRadius: 9, color: "#0a0f1c",
-                background: accent, border: "none", fontWeight: 700,
-              }}>CONNECT WALLET</button>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") useTyped(); }}
-                  placeholder="or paste a wallet address…"
-                  style={{
-                    flex: 1, padding: "9px 12px", borderRadius: 8,
-                    background: "rgba(10,16,30,0.85)", border: "1px solid rgba(120,200,255,0.18)",
-                    color: "#cfe6ff", fontFamily: mono, fontSize: 10, outline: "none",
-                  }}
-                />
-                <button onClick={useTyped} style={{
-                  fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", cursor: "pointer",
-                  padding: "0 14px", borderRadius: 8, color: "rgba(150,200,240,0.8)",
-                  background: "rgba(20,30,50,0.6)", border: "1px solid rgba(120,200,255,0.15)",
-                }}>VIEW</button>
-              </div>
-            </div>
+            <WalletConnect input={input} setInput={setInput} onConnect={connect} onUseTyped={useTyped} />
           ) : loading || !profile ? (
-            <div style={{ fontFamily: mono, fontSize: 10, color: "rgba(150,200,240,0.5)", padding: "20px 0", textAlign: "center" }}>
-              reading your pulse…
-            </div>
+            <EmptyState>reading your pulse…</EmptyState>
           ) : (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                <span style={{ fontFamily: mono, fontSize: 9, color: "rgba(150,200,240,0.5)", letterSpacing: "0.15em" }}>{short(wallet)}</span>
-                <button onClick={() => { setWallet(""); setProfile(null); localStorage.removeItem(WALLET_KEY); }} style={{
-                  background: "none", border: "none", color: "rgba(150,200,240,0.45)",
-                  fontFamily: mono, fontSize: 8.5, letterSpacing: "0.1em", cursor: "pointer",
-                }}>CHANGE</button>
-              </div>
-
-              {/* The killer number */}
-              {share && share.pool_sol > 0 && profile.weight > 0 && (
-                <div style={{
-                  margin: "10px 0 14px", padding: "14px 16px", borderRadius: 12,
-                  background: "linear-gradient(135deg, rgba(20,60,40,0.5), rgba(10,30,25,0.5))",
-                  border: "1px solid rgba(120,255,170,0.3)",
-                }}>
-                  <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,255,190,0.7)", marginBottom: 6 }}>
-                    IF "SPLIT REWARDS" WINS, YOU RECEIVE
-                  </div>
-                  <div style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: "rgb(120,255,170)" }}>
-                    ≈ {share.projected_sol.toFixed(4)} SOL
-                  </div>
-                  <div style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(150,255,190,0.55)", marginTop: 4 }}>
-                    {share.share_pct.toFixed(2)}% of the {share.pool_sol.toFixed(2)} SOL treasury pool
-                  </div>
-                </div>
-              )}
-
-              <Row label="CONVICTION SCORE" value={Math.round(profile.weight).toLocaleString()} accent />
-              <Row label="BALANCE" value={`${Math.round(profile.balance).toLocaleString()} PULSE`} />
-              <Row label="HOLDING FOR" value={`${Math.floor(profile.hold_days)}d → ${profile.hold_multiplier.toFixed(1)}x`} />
-              <Row label="STREAK" value={`${profile.streak_days} days`} />
-              <Row label="REINFORCEMENTS" value={`${profile.reinforcement_count} (+${(profile.reinforcement_bonus * 100).toFixed(0)}%)`} />
-              <Row label="TWEET BONUS" value={profile.tweet_multiplier_active ? "ACTIVE +25%" : "—"} />
-              <Row
-                label="BADGES"
-                value={profile.status_flags.length ? profile.status_flags.join(" · ") : "none yet"}
-              />
-              {profile.balance <= 0 && (
-                <div style={{ fontFamily: mono, fontSize: 9, color: "rgba(255,200,130,0.7)", marginTop: 12, lineHeight: 1.6 }}>
-                  This wallet holds no $PULSE yet — buy in and your conviction starts compounding from day one.
-                </div>
-              )}
-            </div>
+            <MyStake wallet={wallet} profile={profile} share={share} onChange={() => { setWallet(""); setProfile(null); localStorage.removeItem(WALLET_KEY); }} />
           )
         ) : tab === "bond" ? (
           !wallet ? (
-            <div style={{ fontFamily: mono, fontSize: 10, color: "rgba(150,200,240,0.5)", padding: "20px 0", textAlign: "center", lineHeight: 1.6 }}>
+            <EmptyState>
               Connect or paste a wallet to see what PULSE remembers about you.
-            </div>
+            </EmptyState>
           ) : (
-            <div>
-              <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", margin: "4px 0 10px" }}>
-                YOUR BOND WITH PULSE
-              </div>
-              <div style={{
-                padding: "12px 14px", borderRadius: 10, marginBottom: 14,
-                background: "linear-gradient(135deg, rgba(40,30,60,0.55), rgba(20,15,40,0.55))",
-                border: "1px solid rgba(190,160,255,0.3)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.18em", color: "rgba(220,200,255,0.7)" }}>
-                    AFFECTION
-                  </span>
-                  <span style={{ fontFamily: mono, fontSize: 16, color: "rgb(220,180,255)", fontWeight: 700 }}>
-                    {bond?.relationship ? bond.relationship.affection.toFixed(2) : "0.00"}
-                  </span>
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(220,200,255,0.55)", marginTop: 4, lineHeight: 1.5 }}>
-                  How PULSE feels about your wallet. Earned by talking with it, defending it during drops, and showing up over time.
-                </div>
-              </div>
-
-              {bond?.tips_received && bond.tips_received.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,255,190,0.65)", marginBottom: 6 }}>
-                    AUTONOMOUS TIPS PULSE SENT YOU
-                  </div>
-                  {bond.tips_received.map((t, i) => (
-                    <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(120,255,170,0.1)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                        <span style={{ fontFamily: mono, fontSize: 11, color: "rgb(120,255,170)", fontWeight: 700 }}>+{t.amount_sol.toFixed(4)} SOL</span>
-                        <span style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(150,200,240,0.4)" }}>{new Date(t.decided_at).toLocaleDateString()}</span>
-                      </div>
-                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic", fontSize: 10.5, color: "rgba(220,228,250,0.7)", lineHeight: 1.5 }}>
-                        “{t.reasoning}”
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", marginBottom: 6 }}>
-                WHAT PULSE REMEMBERS
-              </div>
-              {!bond?.memories || bond.memories.length === 0 ? (
-                <div style={{ fontFamily: mono, fontSize: 9.5, color: "rgba(150,200,240,0.4)", padding: "8px 0", lineHeight: 1.6 }}>
-                  Nothing yet. Talk to PULSE — it will start to keep notes about you.
-                </div>
-              ) : (
-                bond.memories.map((m, i) => (
-                  <div key={i} style={{
-                    padding: "8px 0", borderBottom: "1px solid rgba(190,160,255,0.08)",
-                    fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic",
-                    fontSize: 11, color: "rgba(220,228,250,0.78)", lineHeight: 1.55,
-                  }}>“{m}”</div>
-                ))
-              )}
-            </div>
+            <BondView bond={bond} />
           )
         ) : (
-          <div>
-            <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", margin: "4px 0 8px" }}>
-              TOP CONVICTION
-            </div>
-            {board.length === 0 && (
-              <div style={{ fontFamily: mono, fontSize: 9.5, color: "rgba(150,200,240,0.4)", padding: "8px 0" }}>no holders ranked yet</div>
-            )}
-            {board.map((e, i) => (
-              <div key={e.wallet} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(120,200,255,0.06)" }}>
-                <span style={{ fontFamily: mono, fontSize: 10, color: i < 3 ? "rgb(255,210,90)" : "rgba(150,200,240,0.5)", width: 18 }}>{i + 1}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, color: "#cfe6ff", flex: 1 }}>{short(e.wallet)}</span>
-                {e.status_flags.length > 0 && (
-                  <span style={{ fontFamily: mono, fontSize: 8, color: "rgba(190,160,255,0.8)" }}>{e.status_flags[0]}</span>
-                )}
-                <span style={{ fontFamily: mono, fontSize: 10, color: "rgb(120,255,170)" }}>{Math.round(e.weight).toLocaleString()}</span>
-              </div>
-            ))}
-            <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", margin: "16px 0 8px" }}>
-              LONGEST STREAKS
-            </div>
-            {streaks.length === 0 && (
-              <div style={{ fontFamily: mono, fontSize: 9.5, color: "rgba(150,200,240,0.4)", padding: "8px 0" }}>no active streaks yet</div>
-            )}
-            {streaks.map((s, i) => (
-              <div key={s.wallet} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(120,200,255,0.06)" }}>
-                <span style={{ fontFamily: mono, fontSize: 10, color: i < 3 ? "rgb(255,210,90)" : "rgba(150,200,240,0.5)", width: 18 }}>{i + 1}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, color: "#cfe6ff", flex: 1 }}>{short(s.wallet)}</span>
-                <span style={{ fontFamily: mono, fontSize: 10, color: "rgb(255,180,120)" }}>{s.current_days}d</span>
+          <Leaderboard board={board} streaks={streaks} />
+        )}
+      </div>
+    </SidePanel>
+  );
+}
+
+function WalletConnect({
+  input, setInput, onConnect, onUseTyped,
+}: { input: string; setInput: (s: string) => void; onConnect: () => void; onUseTyped: () => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+      <div style={{
+        fontFamily: typeT.display, fontSize: typeT.size.body,
+        color: color.textDim, lineHeight: 1.6,
+      }}>
+        See your conviction score, multipliers, streak, and what the next “Split Rewards” payout would send you.
+      </div>
+      <Button onClick={onConnect}>CONNECT WALLET</Button>
+      <div style={{ display: "flex", gap: space[2] }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") onUseTyped(); }}
+          placeholder="or paste a wallet address…"
+          style={{
+            flex: 1, padding: `${space[2]}px ${space[3]}px`,
+            background: color.surface2,
+            border: `1px solid ${color.border}`,
+            borderRadius: radius.sm,
+            color: color.text, fontFamily: typeT.mono, fontSize: typeT.size.label,
+            outline: "none",
+          }}
+        />
+        <Button tone="ghost" size="sm" onClick={onUseTyped}>VIEW</Button>
+      </div>
+    </div>
+  );
+}
+
+function MyStake({
+  wallet, profile, share, onChange,
+}: { wallet: string; profile: ConvictionProfile; share: ProjectedShare | null; onChange: () => void }) {
+  return (
+    <div>
+      {/* Wallet bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: space[3] }}>
+        <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.micro, color: color.textFaint, letterSpacing: typeT.letter.label }}>
+          {shortAddr(wallet)}
+        </span>
+        <button
+          onClick={onChange}
+          style={{
+            background: "none", border: "none", padding: 0,
+            fontFamily: typeT.mono, fontSize: typeT.size.micro,
+            color: color.textFaint, letterSpacing: typeT.letter.label, cursor: "pointer",
+          }}
+        >CHANGE</button>
+      </div>
+
+      {/* The killer number */}
+      {share && share.pool_sol > 0 && profile.weight > 0 && (
+        <div style={{
+          padding: `${space[4]}px ${space[5]}px`,
+          marginBottom: space[4],
+          background: "linear-gradient(135deg, rgba(20,60,40,0.45), rgba(10,30,25,0.45))",
+          border: `1px solid rgba(120,255,170,0.35)`,
+          borderRadius: radius.md,
+        }}>
+          <SectionLabel>If Split Rewards wins, you receive</SectionLabel>
+          <div style={{
+            fontFamily: typeT.mono, fontSize: typeT.size.display,
+            fontWeight: 700, color: color.positive,
+            lineHeight: 1.1, marginTop: space[1],
+          }}>≈ {share.projected_sol.toFixed(4)} SOL</div>
+          <div style={{
+            marginTop: space[1], fontFamily: typeT.mono,
+            fontSize: typeT.size.micro, color: "rgba(120,255,170,0.65)",
+            letterSpacing: typeT.letter.value,
+          }}>{share.share_pct.toFixed(2)}% of the {share.pool_sol.toFixed(2)} SOL treasury pool</div>
+        </div>
+      )}
+
+      <Stat label="CONVICTION SCORE" value={Math.round(profile.weight).toLocaleString()} accent />
+      <Stat label="BALANCE" value={`${Math.round(profile.balance).toLocaleString()} PULSE`} />
+      <Stat label="HOLDING FOR" value={`${Math.floor(profile.hold_days)}d`} hint={`${profile.hold_multiplier.toFixed(1)}× multiplier`} />
+      <Stat label="STREAK" value={`${profile.streak_days} days`} />
+      <Stat label="REINFORCEMENTS" value={`${profile.reinforcement_count}`} hint={`+${(profile.reinforcement_bonus * 100).toFixed(0)}% bonus`} />
+      <Stat label="TWEET BONUS" value={profile.tweet_multiplier_active ? "ACTIVE +25%" : "—"} />
+
+      <div style={{ marginTop: space[3], display: "flex", flexWrap: "wrap", gap: space[1] }}>
+        {profile.status_flags.length === 0 ? (
+          <Pill tone="default">no badges yet</Pill>
+        ) : profile.status_flags.map((f) => <Pill key={f} tone="insight">{f}</Pill>)}
+      </div>
+
+      {profile.balance <= 0 && (
+        <div style={{
+          marginTop: space[4],
+          padding: `${space[3]}px ${space[4]}px`,
+          background: "rgba(255,200,130,0.07)",
+          border: `1px solid rgba(255,200,130,0.25)`,
+          borderRadius: radius.sm,
+          fontFamily: typeT.display, fontSize: typeT.size.body,
+          color: color.caution, lineHeight: 1.6,
+        }}>
+          This wallet holds no $PULSE yet — buy in and your conviction starts compounding from day one.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BondView({ bond }: { bond: WalletBond | null }) {
+  return (
+    <div>
+      {/* Affection card */}
+      <div style={{
+        padding: `${space[4]}px ${space[5]}px`, marginBottom: space[4],
+        background: "linear-gradient(135deg, rgba(40,30,60,0.55), rgba(20,15,40,0.55))",
+        border: `1px solid rgba(190,160,255,0.30)`,
+        borderRadius: radius.md,
+      }}>
+        <SectionLabel>Affection</SectionLabel>
+        <div style={{
+          fontFamily: typeT.mono, fontSize: typeT.size.display,
+          fontWeight: 700, color: color.insight, lineHeight: 1.1, marginTop: space[1],
+        }}>
+          {bond?.relationship ? bond.relationship.affection.toFixed(2) : "0.00"}
+        </div>
+        <div style={{
+          marginTop: space[1], fontFamily: typeT.display,
+          fontSize: typeT.size.body, color: "rgba(220,200,255,0.6)", lineHeight: 1.55,
+        }}>
+          How PULSE feels about your wallet. Earned by talking with it, defending it during drops, and showing up over time.
+        </div>
+      </div>
+
+      {/* Tips */}
+      {bond?.tips_received && bond.tips_received.length > 0 && (
+        <div style={{ marginBottom: space[4] }}>
+          <SectionLabel>Autonomous tips PULSE sent you</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            {bond.tips_received.map((t, i) => (
+              <div key={i} style={{
+                padding: `${space[3]}px ${space[4]}px`,
+                background: color.surface2,
+                border: `1px solid rgba(120,255,170,0.15)`,
+                borderRadius: radius.md,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: space[1] }}>
+                  <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.value, color: color.positive, fontWeight: 700 }}>
+                    +{t.amount_sol.toFixed(4)} SOL
+                  </span>
+                  <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.micro, color: color.textFaint }}>
+                    {new Date(t.decided_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <div style={{
+                  fontFamily: typeT.display, fontStyle: "italic",
+                  fontSize: typeT.size.body, color: color.textDim, lineHeight: 1.55,
+                }}>“{t.reasoning}”</div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Memories */}
+      <SectionLabel>What PULSE remembers about you</SectionLabel>
+      {!bond?.memories || bond.memories.length === 0 ? (
+        <EmptyState>
+          Nothing yet.<br />
+          <span style={{ color: color.textFaint }}>Talk to PULSE — it will start to keep notes about you.</span>
+        </EmptyState>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+          {bond.memories.map((m, i) => (
+            <div key={i} style={{
+              padding: `${space[3]}px ${space[4]}px`,
+              background: color.surface2,
+              border: `1px solid rgba(190,160,255,0.18)`,
+              borderRadius: radius.md,
+              fontFamily: typeT.display, fontStyle: "italic",
+              fontSize: typeT.size.body, color: color.text, lineHeight: 1.6,
+            }}>“{m}”</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Leaderboard({
+  board, streaks,
+}: { board: LeaderboardEntry[]; streaks: { wallet: string; current_days: number }[] }) {
+  return (
+    <div>
+      <SectionLabel>Top conviction</SectionLabel>
+      {board.length === 0 ? (
+        <EmptyState>no holders ranked yet</EmptyState>
+      ) : (
+        <div style={{ marginBottom: space[5] }}>
+          {board.map((e, i) => (
+            <div key={e.wallet} style={{
+              display: "flex", alignItems: "center", gap: space[3],
+              padding: `${space[2]}px 0`,
+              borderBottom: `1px solid ${color.border}`,
+            }}>
+              <span style={{
+                fontFamily: typeT.mono, fontSize: typeT.size.value,
+                color: i < 3 ? color.caution : color.textFaint,
+                width: 22, fontWeight: i < 3 ? 700 : 500,
+              }}>{i + 1}</span>
+              <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.label, color: color.text, flex: 1 }}>
+                {shortAddr(e.wallet)}
+              </span>
+              {e.status_flags[0] && <Pill tone="insight">{e.status_flags[0]}</Pill>}
+              <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.value, color: color.positive }}>
+                {Math.round(e.weight).toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <SectionLabel>Longest streaks</SectionLabel>
+      {streaks.length === 0 ? (
+        <EmptyState>no active streaks yet</EmptyState>
+      ) : streaks.map((s, i) => (
+        <div key={s.wallet} style={{
+          display: "flex", alignItems: "center", gap: space[3],
+          padding: `${space[2]}px 0`,
+          borderBottom: `1px solid ${color.border}`,
+        }}>
+          <span style={{
+            fontFamily: typeT.mono, fontSize: typeT.size.value,
+            color: i < 3 ? color.caution : color.textFaint,
+            width: 22, fontWeight: i < 3 ? 700 : 500,
+          }}>{i + 1}</span>
+          <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.label, color: color.text, flex: 1 }}>
+            {shortAddr(s.wallet)}
+          </span>
+          <span style={{ fontFamily: typeT.mono, fontSize: typeT.size.value, color: color.caution }}>
+            {s.current_days}d
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

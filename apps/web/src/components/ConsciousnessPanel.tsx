@@ -73,8 +73,8 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
   const positionStyle: React.CSSProperties = mobile
     ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
     : {
-        position: "fixed", left: 24, bottom: 72, width: 340, zIndex: 6,
-        maxHeight: "calc(100vh - 120px)", overflowY: "auto",
+        position: "fixed", left: 24, bottom: 110, width: 340, zIndex: 6,
+        maxHeight: "calc(100vh - 220px)", overflowY: "auto",
         animation: "panelIn 0.32s ease-out",
       };
 
@@ -361,7 +361,7 @@ function DesktopShell({
   open, setOpen, accent, moodLabel, ageLabel, arrivalPulse, positionStyle, children,
 }: DesktopShellProps) {
   const toggleStyle: React.CSSProperties = {
-    position: "fixed", left: 24, bottom: 24, zIndex: 6,
+    position: "fixed", left: 24, bottom: 76, zIndex: 6,
     display: "flex", alignItems: "center", gap: 10,
     padding: "10px 14px",
     background: "linear-gradient(180deg, rgba(20,28,44,0.78), rgba(8,12,22,0.82))",

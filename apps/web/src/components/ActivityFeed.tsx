@@ -100,7 +100,7 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
   return (
     <div style={{
       ...(mobile ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
-        : { position: "fixed", top: 24, right: 24, width: 280 }),
+        : { position: "fixed", top: 110, right: 24, width: 280 }),
       zIndex: 5, display: "flex", flexDirection: "column", gap: mobile ? 10 : 14,
       fontFamily: "'Inter', sans-serif", color: "#cfe6ff", pointerEvents: "auto",
     }}>
