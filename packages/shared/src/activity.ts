@@ -12,7 +12,12 @@ export type ActivityKind =
   | "NOTABLE_BUY"
   | "SAFETY_HALT"
   | "DRY_RUN_NOTICE"
-  | "AI_INSIGHT";
+  | "AI_INSIGHT"
+  | "AUTONOMOUS_ACTION"
+  | "AUTONOMOUS_PASS"
+  | "MIND_THOUGHT"
+  | "CONSTITUTION_AMENDED"
+  | "PULSE_TIP";
 
 export const ACTIVITY_KINDS: readonly ActivityKind[] = [
   "TIER_UNLOCK",
@@ -29,4 +34,9 @@ export const ACTIVITY_KINDS: readonly ActivityKind[] = [
   "SAFETY_HALT",
   "DRY_RUN_NOTICE",
   "AI_INSIGHT",
+  "AUTONOMOUS_ACTION",
+  "AUTONOMOUS_PASS",
+  "MIND_THOUGHT",
+  "CONSTITUTION_AMENDED",
+  "PULSE_TIP",
 ] as const;

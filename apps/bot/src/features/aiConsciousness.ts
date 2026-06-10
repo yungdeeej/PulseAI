@@ -60,7 +60,7 @@ const NEGATIVE_DETECT = new RegExp(
   "i",
 );
 
-function applySynonymPositivity(text: string): string {
+export function applySynonymPositivity(text: string): string {
   let t = text;
   for (const [re, rep] of POSITIVE_REFRAME) t = t.replace(re, rep);
   return t.trim();
@@ -231,7 +231,7 @@ async function loadDayTrajectory() {
   return r.rows;
 }
 
-async function buildContext() {
+export async function buildContext() {
   const [tokenState, vaults, activeVote, memories, recentActivity, priceWindow, tierHistory, dayTraj] =
     await Promise.all([
       getTokenState(),

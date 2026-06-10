@@ -12,6 +12,7 @@ import {
 import { logger } from "../utils/logger.js";
 import { postTelegram } from "../integrations/telegram.js";
 import { formatSol } from "../utils/format.js";
+import { generateVoteDebate, narrate } from "../features/narrator.js";
 
 export async function openVote(tier: Tier) {
   const existing = await getActiveVote();
@@ -34,6 +35,11 @@ export async function openVote(tier: Tier) {
   await logActivity("VOTE_OPENED", summary, { vote_id: row.id, tier, options, poolSol });
 
   await postTelegram(summary);
+
+  // Fire-and-forget Claude work: the consciousness argues both sides of the
+  // ballot and reacts to the vote opening. Never blocks the open path.
+  generateVoteDebate(row.id, options, poolSol);
+  narrate("vote_opened", { options: [...options], pool_sol: poolSol, tier });
 
   return row;
 }

@@ -1,13 +1,11 @@
 import type { Express, Request, Response } from "express";
-import { getActiveVote, getVote, insertVoteRecord, getHolderBalance, getWalletStatus, getStreak } from "../db/queries.js";
+import { getActiveVote, getVote, insertVoteRecord } from "../db/queries.js";
 import { tallyVoteRecords } from "../db/queries.js";
 import { verifyVoteSignature } from "../voting/verifyWalletSig.js";
 import { submitTweet } from "../features/tweetMultiplier.js";
-import { reinforcementCount } from "../db/queries.js";
-import { convictionScore, type StatusFlag, type VoteOption } from "@pulse/shared";
-import { daysBetween } from "../utils/timewindow.js";
+import { walletConvictionWeight } from "../features/conviction.js";
+import type { VoteOption } from "@pulse/shared";
 import { logger } from "../utils/logger.js";
-import { pool } from "../db/pool.js";
 
 const VOTE_TS_TOLERANCE_MS = 10 * 60_000; // signed message must be ≤10 min old
 const PROCESSED_SIGS = new Set<string>();
@@ -77,7 +75,7 @@ export function mountPublicApi(app: Express): void {
       });
       if (!ok) return res.status(401).json({ error: "bad signature" });
 
-      const weight = await computeWalletConvictionWeight(wallet);
+      const weight = await walletConvictionWeight(wallet);
       if (weight <= 0) return res.status(403).json({ error: "no conviction weight (do you hold $PULSE?)" });
 
       const record = await insertVoteRecord(voteId, wallet, option as VoteOption, weight, signature);
@@ -107,38 +105,7 @@ export function mountPublicApi(app: Express): void {
   // Read-only helper: dashboard can compute a live preview of a wallet's vote weight.
   app.get("/wallets/:wallet/conviction", async (req, res) => {
     const wallet = req.params.wallet!;
-    const weight = await computeWalletConvictionWeight(wallet);
+    const weight = await walletConvictionWeight(wallet);
     res.json({ wallet, weight });
   });
-}
-
-async function computeWalletConvictionWeight(wallet: string): Promise<number> {
-  const balance = await getHolderBalance(wallet);
-  if (!balance || Number(balance.balance) <= 0) return 0;
-  const status = await getWalletStatus(wallet);
-  const flags: StatusFlag[] = [];
-  if (status?.pioneer) flags.push("PIONEER");
-  if (status?.believer) flags.push("BELIEVER");
-  if (status?.conviction) flags.push("CONVICTION");
-  if (status?.ascendant) flags.push("ASCENDANT");
-  const streak = await getStreak(wallet);
-  const rCount = await reinforcementCount(wallet);
-  const tweetActive = await walletHasActiveTweetBonus(wallet);
-  return convictionScore({
-    balance: Number(balance.balance),
-    holdDays: daysBetween(balance.first_seen_at, new Date()),
-    tierStreakDays: Number(streak?.current_days ?? 0),
-    reinforcementCount: rCount,
-    statusFlags: flags,
-    tweetMultiplierActive: tweetActive,
-  });
-}
-
-async function walletHasActiveTweetBonus(wallet: string): Promise<boolean> {
-  const r = await pool.query<{ c: number }>(
-    `SELECT COUNT(*)::int AS c FROM tweet_multipliers
-       WHERE wallet = $1 AND status = 'active' AND expires_at > NOW()`,
-    [wallet],
-  );
-  return Number(r.rows[0]?.c ?? 0) > 0;
 }

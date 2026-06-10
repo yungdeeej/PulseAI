@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { blobLive } from "../lib/blobLive";
 import { useDashboard } from "../lib/useDashboard";
+import { color as C, glass, radius, type as typeT } from "../lib/design";
 
 const TIER_LABELS: Record<string, string> = {
   DISCOVERY: "TIER 0 · DISCOVERY",
@@ -31,20 +32,19 @@ function Card({ label, children, accent }: { label: string; children: React.Reac
   return (
     <div style={{
       position: "relative",
-      background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
-      border: "1px solid rgba(120, 200, 255, 0.14)", borderRadius: 10, padding: "14px 16px",
-      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-      boxShadow: "0 0 0 1px rgba(80,180,255,0.04) inset, 0 18px 40px -20px rgba(0,180,255,0.20)",
+      background: C.surface1,
+      border: `1px solid ${C.border}`, borderRadius: radius.md, padding: "14px 16px",
+      ...glass,
       overflow: "hidden",
     }}>
       <div style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22,
-        borderTop: `1px solid ${accent ?? "rgba(120,210,255,0.55)"}`,
-        borderLeft: `1px solid ${accent ?? "rgba(120,210,255,0.55)"}`, borderTopLeftRadius: 10 }} />
+        borderTop: `1px solid ${accent ?? C.borderAccent}`,
+        borderLeft: `1px solid ${accent ?? C.borderAccent}`, borderTopLeftRadius: radius.md }} />
       <div style={{ position: "absolute", bottom: 0, right: 0, width: 22, height: 22,
-        borderBottom: `1px solid ${accent ?? "rgba(120,210,255,0.55)"}`,
-        borderRight: `1px solid ${accent ?? "rgba(120,210,255,0.55)"}`, borderBottomRightRadius: 10 }} />
-      <div style={{ fontSize: 9.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.55)",
-        textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
+        borderBottom: `1px solid ${accent ?? C.borderAccent}`,
+        borderRight: `1px solid ${accent ?? C.borderAccent}`, borderBottomRightRadius: radius.md }} />
+      <div style={{ fontSize: typeT.size.micro, letterSpacing: typeT.letter.label, color: C.textFaint,
+        textTransform: "uppercase", fontFamily: typeT.mono, marginBottom: 8 }}>
         {label}
       </div>
       {children}
@@ -148,9 +148,9 @@ export function LeftPanels({ mobile = false, onSwapClick }: { mobile?: boolean; 
   return (
     <div style={{
       ...(mobile ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
-        : { position: "fixed", top: 24, left: 24, width: 260 }),
+        : { position: "fixed", top: 110, left: 24, width: 260 }),
       zIndex: 5, display: "flex", flexDirection: "column", gap: mobile ? 10 : 14,
-      fontFamily: "'Inter', sans-serif", color: "#cfe6ff", pointerEvents: "auto",
+      fontFamily: typeT.display, color: C.text, pointerEvents: "auto",
     }}>
       <div style={{ padding: "0 4px" }}>
         <div style={{ fontSize: 10, letterSpacing: "0.4em", color: "rgba(120,180,230,0.6)", fontFamily: "'JetBrains Mono', monospace" }}>
@@ -290,7 +290,7 @@ function ActionRow({ accent, mintAddress, onSwapClick }: { accent: string; mintA
   const iconBtnBase: React.CSSProperties = {
     flex: "0 0 44px", height: 40,
     display: "flex", alignItems: "center", justifyContent: "center",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
+    background: "rgba(14, 20, 36, 0.72)",
     border: "1px solid rgba(120,200,255,0.18)", borderRadius: 10, color: "#cfe6ff",
     cursor: "pointer", transition: "border-color 0.2s, box-shadow 0.2s, color 0.2s",
     backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", textDecoration: "none",
@@ -303,7 +303,7 @@ function ActionRow({ accent, mintAddress, onSwapClick }: { accent: string; mintA
     fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5,
     letterSpacing: "0.22em", fontWeight: 600, textTransform: "uppercase",
     background: swapDisabled
-      ? "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))"
+      ? "rgba(14, 20, 36, 0.72)"
       : `linear-gradient(180deg, ${accent}38, ${accent}18)`,
     border: `1px solid ${swapDisabled ? "rgba(120,200,255,0.18)" : `${accent}88`}`,
     color: swapDisabled ? "rgba(207,230,255,0.45)" : "#e7f1ff",

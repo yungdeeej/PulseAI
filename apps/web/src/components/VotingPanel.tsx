@@ -120,6 +120,7 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("–");
   const [boostOpen, setBoostOpen] = useState(false);
+  const [debateOpen, setDebateOpen] = useState(false);
   const [tweetUrl, setTweetUrl] = useState("");
   const [tweetState, setTweetState] = useState<"idle" | "submitting" | "pending" | "error">("idle");
   const [tweetError, setTweetError] = useState<string | null>(null);
@@ -165,26 +166,25 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
     ? { width: "100%", animation: "panelIn 0.6s ease-out" }
     : {
         position: "fixed",
-        bottom: 60, left: "50%", transform: "translateX(-50%)",
+        bottom: 110, left: "50%", transform: "translateX(-50%)",
         width: 400, zIndex: 5,
         animation: "panelIn 0.5s ease-out",
       };
 
   const cardStyle: React.CSSProperties = {
     position: "relative",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.72), rgba(8,12,22,0.80))",
-    border: "1px solid rgba(120,200,255,0.16)",
+    background: "rgba(14, 20, 36, 0.72)",
+    border: "1px solid rgba(120,200,255,0.10)",
     borderRadius: 12,
-    backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
-    boxShadow: "0 0 0 1px rgba(80,180,255,0.04) inset, 0 24px 60px -20px rgba(0,120,255,0.18)",
+    backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)",
     overflow: "hidden", padding: "16px 18px",
     pointerEvents: "auto",
-    fontFamily: "'Inter', sans-serif", color: "#cfe6ff",
+    fontFamily: "'Space Grotesk', system-ui, sans-serif", color: "#E8EDFA",
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 9.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.55)",
-    textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 9, letterSpacing: "0.22em", color: "rgba(232,237,250,0.38)",
+    textTransform: "uppercase", fontFamily: "'JetBrains Mono', ui-monospace, monospace",
   };
 
   // ── No active vote: show compact standby teaser ─────────────────────────────
@@ -312,6 +312,59 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
             <span style={{ color: "rgb(220,180,255)" }}>◆</span>{" "}
             I lean toward <em style={{ color: "rgb(220,180,255)", fontStyle: "italic" }}>{OPTION_LABELS[aiInsight.vote_lean] ?? aiInsight.vote_lean}</em>
             {aiInsight.vote_reason ? ` — ${aiInsight.vote_reason}` : "."}
+          </div>
+        )}
+
+        {/* The entity argues both sides of the ballot (Claude-generated at vote open) */}
+        {vote.debate && vote.debate.cases.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <button
+              onClick={() => setDebateOpen((v) => !v)}
+              style={{
+                width: "100%", textAlign: "left", cursor: "pointer",
+                background: "rgba(220,180,255,0.05)",
+                border: "1px solid rgba(220,180,255,0.2)", borderRadius: 6,
+                padding: "7px 10px",
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+                letterSpacing: "0.2em", color: "rgb(220,180,255)",
+              }}
+            >
+              ◆ THE ENTITY ARGUES BOTH SIDES {debateOpen ? "▾" : "▸"}
+            </button>
+            {debateOpen && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                {vote.debate.cases.map((c) => (
+                  <div key={c.option} style={{
+                    padding: "8px 10px", borderRadius: 6,
+                    background: "rgba(15,20,38,0.6)",
+                    border: vote.debate?.lean === c.option
+                      ? "1px solid rgba(220,180,255,0.45)"
+                      : "1px solid rgba(120,200,255,0.1)",
+                  }}>
+                    <div style={{
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5,
+                      letterSpacing: "0.18em", color: "rgba(180,220,255,0.8)", marginBottom: 4,
+                    }}>
+                      FOR “{c.option.toUpperCase()}” {vote.debate?.lean === c.option ? " · ITS PICK" : ""}
+                    </div>
+                    <div style={{
+                      fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic",
+                      fontSize: 11, lineHeight: 1.5, color: "rgba(220,228,250,0.85)",
+                    }}>
+                      {c.argument}
+                    </div>
+                  </div>
+                ))}
+                {vote.debate.lean_reason && (
+                  <div style={{
+                    fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic",
+                    fontSize: 10.5, color: "rgba(220,180,255,0.75)", padding: "0 2px",
+                  }}>
+                    “{vote.debate.lean_reason}”
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

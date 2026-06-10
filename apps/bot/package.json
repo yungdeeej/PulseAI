@@ -14,6 +14,7 @@
     "migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@pulse/shared": "workspace:*",
     "@solana/spl-token": "^0.4.8",
     "@solana/web3.js": "^1.95.2",
