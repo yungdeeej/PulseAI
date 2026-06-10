@@ -246,6 +246,73 @@ export async function createChatSession(args: {
  * Stream a chat message. The endpoint replies with SSE frames over a POST
  * body, so we parse the ReadableStream manually (EventSource is GET-only).
  */
+// ─── Sovereign AI: Constitution + Autonomous + Mind Stream ──────────────────
+
+export interface ConstitutionClause {
+  clause: string;
+  value: unknown;
+  description: string;
+  version: number;
+  updated_at: string;
+}
+
+export interface AutonomousAction {
+  id: number;
+  decided_at: string;
+  action_type: "buyback" | "tip_holder" | "open_bounty" | "pass";
+  target_wallet: string | null;
+  amount_sol: number;
+  tx_signature: string | null;
+  reasoning: string;
+  status: "passed" | "executed" | "failed";
+}
+
+export interface MindThought {
+  id: number;
+  thought: string;
+  mood: string;
+  kind: "reflection" | "dream" | "reaction" | "reasoning";
+  related_to: string | null;
+  created_at: string;
+}
+
+export interface SovereignSnapshot {
+  constitution: ConstitutionClause[];
+  actions: AutonomousAction[];
+  thoughts: MindThought[];
+}
+
+export async function fetchSovereign(): Promise<SovereignSnapshot> {
+  const res = await fetch(`${BASE}/api/sovereign`);
+  if (!res.ok) throw new Error(`sovereign fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchMindStream(limit = 30): Promise<MindThought[]> {
+  const res = await fetch(`${BASE}/api/mindstream?limit=${limit}`);
+  if (!res.ok) throw new Error(`mindstream fetch failed: ${res.status}`);
+  const data = await res.json();
+  return data.thoughts ?? [];
+}
+
+export interface WalletBond {
+  relationship: {
+    wallet: string;
+    affection: number;
+    notable_count: number;
+    last_summary: string | null;
+    last_interaction: string;
+  } | null;
+  memories: string[];
+  tips_received: { amount_sol: number; decided_at: string; reasoning: string }[];
+}
+
+export async function fetchBond(wallet: string): Promise<WalletBond | null> {
+  const res = await fetch(`${BASE}/api/wallets/${encodeURIComponent(wallet)}/bond`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function streamChat(args: {
   message: string;
   token: string | null;

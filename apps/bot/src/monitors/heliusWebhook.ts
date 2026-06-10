@@ -13,6 +13,7 @@ import { mountDashboardApi } from "../api/dashboardApi.js";
 import { mountChatApi } from "../api/chatApi.js";
 import { mountProfileApi } from "../api/profileApi.js";
 import { mountSseApi } from "../api/events.js";
+import { mountSovereignApi } from "../api/sovereignApi.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,6 +111,7 @@ export function createWebhookApp() {
   mountChatApi(app);
   mountProfileApi(app);
   mountSseApi(app);
+  mountSovereignApi(app);
 
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, dry_run: env.DRY_RUN, network: env.NETWORK });

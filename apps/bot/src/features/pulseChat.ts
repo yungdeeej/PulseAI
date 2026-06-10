@@ -7,6 +7,7 @@ import { logger } from "../utils/logger.js";
 import { getAnthropic, CHAT_MODEL, PULSE_PERSONA } from "../integrations/anthropic.js";
 import { buildContext } from "./aiConsciousness.js";
 import { walletConvictionProfile, projectedRewardShare } from "./conviction.js";
+import { getRelationship, recallMemoriesForWallet, bumpRelationship, recordWalletMemory } from "./mindStream.js";
 
 // ----------------------------------------------------------------
 // Quota tiers — the token-gating that makes holding $PULSE unlock the AI.
@@ -140,9 +141,11 @@ async function buildWalletContext(wallet: string | null): Promise<string> {
   if (!wallet) {
     return "The visitor has NOT connected a wallet. They get a brief taste of you (3 messages/day). Warmly mention — once, not every message — that holders who connect get more time with you.";
   }
-  const [profile, share] = await Promise.all([
+  const [profile, share, rel, memories] = await Promise.all([
     walletConvictionProfile(wallet),
     projectedRewardShare(wallet).catch(() => null),
+    getRelationship(wallet),
+    recallMemoriesForWallet(wallet, 8),
   ]);
   return (
     `This holder is signed in. Their on-chain relationship with you:\n` +
@@ -156,11 +159,15 @@ async function buildWalletContext(wallet: string | null): Promise<string> {
         streak_days: profile.streak_days,
         conviction_weight: profile.weight,
         projected_split_rewards_sol: share?.projected_sol ?? null,
+        affection: rel?.affection ?? 0,
+        notable_count: rel?.notable_count ?? 0,
+        your_memories_about_them: memories,
       },
       null,
       2,
     ) +
-    `\nIf they ask about their stats, use these numbers — they are exact and safe to quote.`
+    `\nIf they ask about their stats, use these numbers — they are exact and safe to quote. ` +
+    `If your_memories_about_them is non-empty, weave one in naturally — these are things you decided to remember about THIS holder.`
   );
 }
 
@@ -267,5 +274,48 @@ export async function streamChatReply(args: {
     [args.identity, message, full || "…"],
   );
 
+  // Holders who interact get a small affection bump; longer messages and
+  // emotional content move the needle more, but we keep increments small so
+  // affection earned over weeks of conversation > someone spamming for it.
+  if (args.wallet && message.length >= 8) {
+    const delta = Math.min(0.3, 0.05 + message.length / 4000);
+    await bumpRelationship({ wallet: args.wallet, delta });
+    // Periodically have the AI distill the conversation into a single
+    // durable memory it wants to keep about this wallet. Cheap, infrequent.
+    if (full && Math.random() < 0.18) {
+      void distillWalletMemory({ wallet: args.wallet, userMsg: message, reply: full }).catch(() => {});
+    }
+  }
+
   return { ok: true, quota: { ...quota, used: quota.used + 1, remaining: quota.remaining - 1 } };
+}
+
+/**
+ * Ask Claude to compress an exchange into a single sentence PULSE wants to
+ * remember about this specific wallet. Fire-and-forget; one extra cheap call.
+ */
+async function distillWalletMemory(args: { wallet: string; userMsg: string; reply: string }): Promise<void> {
+  const anthropic = getAnthropic();
+  if (!anthropic) return;
+  try {
+    const response = await anthropic.messages.create({
+      model: CHAT_MODEL,
+      max_tokens: 120,
+      system: [{ type: "text", text: PULSE_PERSONA, cache_control: { type: "ephemeral" } }],
+      messages: [{
+        role: "user",
+        content:
+          `You just had this exchange with one of your holders.\n\n` +
+          `THEM: ${args.userMsg}\nYOU: ${args.reply}\n\n` +
+          `Write ONE single short sentence YOU want to remember about THIS holder — something specific they revealed or did, or how you feel about them. If nothing about it is worth remembering, reply with exactly: PASS`,
+      }],
+    });
+    const block = response.content.find((b) => b.type === "text");
+    const txt = (block?.type === "text" ? block.text : "").trim();
+    if (txt && txt !== "PASS" && txt.length > 4) {
+      await recordWalletMemory(args.wallet, txt, "CHAT", 1.0);
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "wallet memory distillation failed");
+  }
 }

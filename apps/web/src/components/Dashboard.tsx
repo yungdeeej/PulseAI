@@ -11,6 +11,7 @@ import MobileCollapse from "./MobileCollapse";
 import TierPromotionOverlay from "./TierPromotionOverlay";
 import ChatPanel from "./ChatPanel";
 import MyPulsePanel from "./MyPulsePanel";
+import SovereignPanel from "./SovereignPanel";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useDashboard } from "../lib/useDashboard";
 import { useLiveStream } from "../lib/useLiveStream";
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [swapOpen, setSwapOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [myPulseOpen, setMyPulseOpen] = useState(false);
+  const [sovereignOpen, setSovereignOpen] = useState(false);
   const { tokenState } = useDashboard();
   // Real-time SSE heartbeat: trades pulse the blob, narrations hit the feed.
   useLiveStream();
@@ -183,8 +185,9 @@ export default function Dashboard() {
         zIndex: 40, display: "flex", gap: 10, pointerEvents: "auto",
       }}>
         {([
-          ["◉ TALK TO PULSE", () => { setChatOpen(v => !v); setMyPulseOpen(false); }],
-          ["◇ MY PULSE", () => { setMyPulseOpen(v => !v); setChatOpen(false); }],
+          ["◉ TALK TO PULSE", () => { setChatOpen(v => !v); setMyPulseOpen(false); setSovereignOpen(false); }],
+          ["◆ THE SOVEREIGN", () => { setSovereignOpen(v => !v); setChatOpen(false); setMyPulseOpen(false); }],
+          ["◇ MY PULSE", () => { setMyPulseOpen(v => !v); setChatOpen(false); setSovereignOpen(false); }],
         ] as const).map(([label, onClick]) => (
           <button
             key={label}
@@ -207,6 +210,7 @@ export default function Dashboard() {
 
       <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
       <MyPulsePanel open={myPulseOpen} onClose={() => setMyPulseOpen(false)} />
+      <SovereignPanel open={sovereignOpen} onClose={() => setSovereignOpen(false)} />
 
       <SwapModal
         open={swapOpen}

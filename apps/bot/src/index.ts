@@ -11,6 +11,8 @@ import { recomputeAllStreaks } from "./features/streak.js";
 import { pollTweetEngagements } from "./features/tweetMultiplier.js";
 import { evaluateHoldBounties, maybeOpenBounty } from "./actions/bounty.js";
 import { generateInsight, extractLifecycleMemories } from "./features/aiConsciousness.js";
+import { autonomousTick } from "./features/sovereign.js";
+import { generateAmbientThought } from "./features/mindStream.js";
 import {
   BETTERSTACK_PING_MS,
   BOT_CONFIG_POLL_MS,
@@ -137,6 +139,19 @@ async function main() {
   };
   cron.schedule("*/5 * * * *", () => { void consciousnessTick(); });
   setTimeout(() => { void consciousnessTick(); }, 20_000);
+
+  // Sovereign autonomous tick — every 15 min, but the eligibility gate
+  // (cooldown + daily cap + treasury floor) inside autonomousTick is what
+  // actually decides whether anything fires. Single-flight inside.
+  cron.schedule("*/15 * * * *", () => {
+    autonomousTick().catch((err) => logger.error({ err }, "autonomous tick failed"));
+  });
+
+  // Ambient Mind Stream — cheap Haiku thoughts every ~3 minutes so the
+  // dashboard always has a fresh line. Skips silently if no API key.
+  cron.schedule("*/3 * * * *", () => {
+    generateAmbientThought().catch((err) => logger.warn({ err }, "ambient thought failed"));
+  });
 
   registerShutdown();
   logger.info("pulse bot online");

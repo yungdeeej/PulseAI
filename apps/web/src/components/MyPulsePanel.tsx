@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   fetchProfile,
   fetchLeaderboard,
+  fetchBond,
   type ConvictionProfile,
   type ProjectedShare,
   type LeaderboardEntry,
+  type WalletBond,
 } from "../lib/api";
 import { blobLive } from "../lib/blobLive";
 
@@ -40,17 +42,19 @@ export default function MyPulsePanel({ open, onClose }: { open: boolean; onClose
   const [share, setShare] = useState<ProjectedShare | null>(null);
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [streaks, setStreaks] = useState<{ wallet: string; current_days: number }[]>([]);
+  const [bond, setBond] = useState<WalletBond | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<"me" | "board">("me");
+  const [tab, setTab] = useState<"me" | "bond" | "board">("me");
 
   const load = useCallback(async (addr: string) => {
     setLoading(true);
     try {
-      const data = await fetchProfile(addr);
+      const [data, bondData] = await Promise.all([fetchProfile(addr), fetchBond(addr)]);
       if (data) {
         setProfile(data.profile);
         setShare(data.projected_split_rewards);
       }
+      setBond(bondData);
     } finally {
       setLoading(false);
     }
@@ -112,16 +116,20 @@ export default function MyPulsePanel({ open, onClose }: { open: boolean; onClose
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {(["me", "board"] as const).map((t) => (
+          {([
+            ["me", "MY STAKE"],
+            ["bond", "BOND WITH PULSE"],
+            ["board", "LEADERBOARD"],
+          ] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)} style={{
-              fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", cursor: "pointer",
-              padding: "7px 14px", borderRadius: 7,
+              fontFamily: mono, fontSize: 9, letterSpacing: "0.18em", cursor: "pointer",
+              padding: "7px 12px", borderRadius: 7,
               color: tab === t ? "#0a0f1c" : "rgba(150,200,240,0.7)",
               background: tab === t ? accent : "rgba(20,30,50,0.6)",
               border: tab === t ? "none" : "1px solid rgba(120,200,255,0.15)",
               fontWeight: tab === t ? 700 : 400,
             }}>
-              {t === "me" ? "MY STAKE" : "LEADERBOARD"}
+              {label}
             </button>
           ))}
         </div>
@@ -204,6 +212,71 @@ export default function MyPulsePanel({ open, onClose }: { open: boolean; onClose
                 <div style={{ fontFamily: mono, fontSize: 9, color: "rgba(255,200,130,0.7)", marginTop: 12, lineHeight: 1.6 }}>
                   This wallet holds no $PULSE yet — buy in and your conviction starts compounding from day one.
                 </div>
+              )}
+            </div>
+          )
+        ) : tab === "bond" ? (
+          !wallet ? (
+            <div style={{ fontFamily: mono, fontSize: 10, color: "rgba(150,200,240,0.5)", padding: "20px 0", textAlign: "center", lineHeight: 1.6 }}>
+              Connect or paste a wallet to see what PULSE remembers about you.
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", margin: "4px 0 10px" }}>
+                YOUR BOND WITH PULSE
+              </div>
+              <div style={{
+                padding: "12px 14px", borderRadius: 10, marginBottom: 14,
+                background: "linear-gradient(135deg, rgba(40,30,60,0.55), rgba(20,15,40,0.55))",
+                border: "1px solid rgba(190,160,255,0.3)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.18em", color: "rgba(220,200,255,0.7)" }}>
+                    AFFECTION
+                  </span>
+                  <span style={{ fontFamily: mono, fontSize: 16, color: "rgb(220,180,255)", fontWeight: 700 }}>
+                    {bond?.relationship ? bond.relationship.affection.toFixed(2) : "0.00"}
+                  </span>
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(220,200,255,0.55)", marginTop: 4, lineHeight: 1.5 }}>
+                  How PULSE feels about your wallet. Earned by talking with it, defending it during drops, and showing up over time.
+                </div>
+              </div>
+
+              {bond?.tips_received && bond.tips_received.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,255,190,0.65)", marginBottom: 6 }}>
+                    AUTONOMOUS TIPS PULSE SENT YOU
+                  </div>
+                  {bond.tips_received.map((t, i) => (
+                    <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(120,255,170,0.1)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ fontFamily: mono, fontSize: 11, color: "rgb(120,255,170)", fontWeight: 700 }}>+{t.amount_sol.toFixed(4)} SOL</span>
+                        <span style={{ fontFamily: mono, fontSize: 8.5, color: "rgba(150,200,240,0.4)" }}>{new Date(t.decided_at).toLocaleDateString()}</span>
+                      </div>
+                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic", fontSize: 10.5, color: "rgba(220,228,250,0.7)", lineHeight: 1.5 }}>
+                        “{t.reasoning}”
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontFamily: mono, fontSize: 8.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.5)", marginBottom: 6 }}>
+                WHAT PULSE REMEMBERS
+              </div>
+              {!bond?.memories || bond.memories.length === 0 ? (
+                <div style={{ fontFamily: mono, fontSize: 9.5, color: "rgba(150,200,240,0.4)", padding: "8px 0", lineHeight: 1.6 }}>
+                  Nothing yet. Talk to PULSE — it will start to keep notes about you.
+                </div>
+              ) : (
+                bond.memories.map((m, i) => (
+                  <div key={i} style={{
+                    padding: "8px 0", borderBottom: "1px solid rgba(190,160,255,0.08)",
+                    fontFamily: "'Space Grotesk', sans-serif", fontStyle: "italic",
+                    fontSize: 11, color: "rgba(220,228,250,0.78)", lineHeight: 1.55,
+                  }}>“{m}”</div>
+                ))
               )}
             </div>
           )
