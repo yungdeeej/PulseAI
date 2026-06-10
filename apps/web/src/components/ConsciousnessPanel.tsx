@@ -83,18 +83,18 @@ export default function ConsciousnessPanel({ mobile = false }: { mobile?: boolea
   // and the gentle border glow when a new insight arrives.
   const cardStyle: React.CSSProperties = {
     position: "relative",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
+    background: "rgba(14, 20, 36, 0.72)",
     border: `1px solid ${arrivalPulse ? `${accent}aa` : BASE_BORDER}`,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "14px 16px",
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
+    backdropFilter: "blur(16px) saturate(180%)",
+    WebkitBackdropFilter: "blur(16px) saturate(180%)",
     boxShadow: arrivalPulse
       ? `0 0 0 1px ${accent}33 inset, 0 0 28px -4px ${accent}55, 0 18px 40px -20px ${accent}66`
-      : "0 0 0 1px rgba(80,180,255,0.04) inset, 0 18px 40px -20px rgba(0,180,255,0.20)",
+      : "none",
     overflow: "hidden",
-    fontFamily: "'Inter', sans-serif",
-    color: "#cfe6ff",
+    fontFamily: "'Space Grotesk', system-ui, sans-serif",
+    color: "#E8EDFA",
     transition: "border 0.6s ease, box-shadow 0.6s ease",
     animation: arrivalPulse ? "consciousnessArrival 2.2s ease-out" : undefined,
   };
@@ -364,7 +364,7 @@ function DesktopShell({
     position: "fixed", left: 24, bottom: 76, zIndex: 6,
     display: "flex", alignItems: "center", gap: 10,
     padding: "10px 14px",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.78), rgba(8,12,22,0.82))",
+    background: "rgba(20, 28, 46, 0.82)",
     border: `1px solid ${open || arrivalPulse ? `${accent}88` : "rgba(120,200,255,0.22)"}`,
     borderRadius: 999,
     color: "#cfe6ff", cursor: "pointer", textAlign: "left",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { activityFeed, blobLive, EMOTION_COLOR, pushEvent } from "../lib/blobLive";
 import { useDashboard } from "../lib/useDashboard";
+import { color as C, glass, radius, type as typeT } from "../lib/design";
 
 function BuySellBar({ buys, sells }: { buys: number; sells: number }) {
   const total = buys + sells;
@@ -86,15 +87,14 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
 
   const cardStyle: React.CSSProperties = {
     position: "relative",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
-    border: "1px solid rgba(120, 200, 255, 0.14)", borderRadius: 10, padding: "14px 16px",
-    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-    boxShadow: "0 0 0 1px rgba(80,180,255,0.04) inset, 0 18px 40px -20px rgba(0,180,255,0.20)",
+    background: C.surface1,
+    border: `1px solid ${C.border}`, borderRadius: radius.md, padding: "14px 16px",
+    ...glass,
     overflow: "hidden",
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: 9.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.55)",
-    textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 8,
+    fontSize: typeT.size.micro, letterSpacing: typeT.letter.label, color: C.textFaint,
+    textTransform: "uppercase", fontFamily: typeT.mono, marginBottom: 8,
   };
 
   return (
@@ -102,7 +102,7 @@ export default function RightPanels({ mobile = false }: { mobile?: boolean } = {
       ...(mobile ? { position: "relative", width: "100%", animation: "panelIn 0.6s ease-out" }
         : { position: "fixed", top: 110, right: 24, width: 280 }),
       zIndex: 5, display: "flex", flexDirection: "column", gap: mobile ? 10 : 14,
-      fontFamily: "'Inter', sans-serif", color: "#cfe6ff", pointerEvents: "auto",
+      fontFamily: typeT.display, color: C.text, pointerEvents: "auto",
     }}>
       <div style={cardStyle}>
         <div style={labelStyle}>Emotional State</div>

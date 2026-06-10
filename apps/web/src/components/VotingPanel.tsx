@@ -173,19 +173,18 @@ export default function VotingPanel({ mobile = false }: { mobile?: boolean }) {
 
   const cardStyle: React.CSSProperties = {
     position: "relative",
-    background: "linear-gradient(180deg, rgba(20,28,44,0.72), rgba(8,12,22,0.80))",
-    border: "1px solid rgba(120,200,255,0.16)",
+    background: "rgba(14, 20, 36, 0.72)",
+    border: "1px solid rgba(120,200,255,0.10)",
     borderRadius: 12,
-    backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
-    boxShadow: "0 0 0 1px rgba(80,180,255,0.04) inset, 0 24px 60px -20px rgba(0,120,255,0.18)",
+    backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)",
     overflow: "hidden", padding: "16px 18px",
     pointerEvents: "auto",
-    fontFamily: "'Inter', sans-serif", color: "#cfe6ff",
+    fontFamily: "'Space Grotesk', system-ui, sans-serif", color: "#E8EDFA",
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 9.5, letterSpacing: "0.22em", color: "rgba(150,200,240,0.55)",
-    textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 9, letterSpacing: "0.22em", color: "rgba(232,237,250,0.38)",
+    textTransform: "uppercase", fontFamily: "'JetBrains Mono', ui-monospace, monospace",
   };
 
   // ── No active vote: show compact standby teaser ─────────────────────────────

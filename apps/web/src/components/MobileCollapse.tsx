@@ -37,7 +37,7 @@ export default function MobileCollapse({
   return (
     <div style={{
       position: "relative",
-      background: "linear-gradient(180deg, rgba(20,28,44,0.55), rgba(8,12,22,0.60))",
+      background: "rgba(14, 20, 36, 0.72)",
       border: `1px solid ${open ? accent : "rgba(120,200,255,0.14)"}`,
       borderRadius: 12,
       backdropFilter: "blur(14px)",
